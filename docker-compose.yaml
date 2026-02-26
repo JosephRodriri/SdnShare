@@ -1,0 +1,96 @@
+# Docker Compose for SDN Lab
+services:
+  # Define a "controller" service
+  controller:
+    image: martimy/ryu-flowmanager
+    environment:
+     - NETWORK_CONFIG_FILE=scripts/network_config.yaml
+     - GRAPHITE_SERVER=graphite
+     - GRAPHITE_POLLTIME=30
+     - INFLUXDB_HOST=influxdb
+     - INFLUXDB_POLLTIME=30
+     - PROMETHEUS_POLLTIME=30
+#    command: "scripts/learning_switch_tree.py --observe-links"
+    command: 
+      - scripts/dc_switch_1.py
+      - --observe-links
+    volumes:
+     - ./scripts:/home/auser/scripts
+    ports:
+     - "6633"  # Controller port
+     - "6653"  # Controller port
+     - "8080:8080"  # GUI port
+
+  # Define a "mininet" service
+  mininet:
+    image: martimy/mininet
+    depends_on: # In this case only
+     - controller
+    tty: true # Allocates a pseudo-TTY (teletypewriter) for the container
+    privileged: true # required for mininet to run inside a container
+    environment:
+     - SDN_CONTROLLER=controller
+     - HISTFILE=/root/scripts/.bash_history
+      #  DISPLAY  # Passes the value of the DISPLAY environment variable to the container
+    volumes:
+     - /tmp/.X11-unix:/tmp/.X11-unix    # Mounts X11 socket for GUI access
+     - /lib/modules:/lib/modules        # Mounts kernel modules from the host to the container
+     - ./scripts:/root/scripts
+
+  # Define a "Graphite" service
+  graphite:
+    image: graphiteapp/graphite-statsd
+    volumes:
+     - ./graphite/conf:/opt/graphite/conf
+     - ./conf/storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf
+     - ./conf/storage-aggregation.conf:/opt/graphite/conf/storage-aggregation.conf
+     - ./graphite/storage:/opt/graphite/storage
+    ports:
+     - "2003-2004"
+     - "2023-2024"
+     - "9000:80"
+    profiles:
+      - graphite
+      - monitor
+
+  # Define a "Prometheus" service
+  prometheus:
+    image: prom/prometheus
+    volumes:
+     - ./scripts/prometheus.yaml:/etc/prometheus/prometheus.yml
+     - ./prometheus:/prometheus
+    command:
+     - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+     - "9090:9090"
+    profiles:
+      - prometheus
+      - monitor
+
+  # Define a "InfluxDB" service
+  influxdb:
+    image: influxdb:1.8
+    volumes:
+     - ./influxdb/data:/var/lib/influxdb2" \
+     - ./influxdb/config:/etc/influxdb2" \
+    ports:
+     - "8086:8086"
+    profiles:
+      - influxdb
+      - monitor
+
+  # Define a "Grafana" service
+  grafana:
+    image: grafana/grafana:latest
+    user: "0"
+    volumes:
+      - ./grafana/grafana_data:/var/lib/grafana
+      - ./grafana/grafana_conf/grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    profiles:
+      - grafana
+      - monitor
