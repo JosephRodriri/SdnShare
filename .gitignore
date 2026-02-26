@@ -1,0 +1,15 @@
+# Directorios de datos en tiempo de ejecución (creados por Docker)
+grafana/grafana_data/
+graphite/storage/
+prometheus/
+influxdb/data/
+influxdb/config/
+graphite/conf/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos de entorno
+.env
