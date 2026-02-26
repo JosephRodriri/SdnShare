@@ -84,10 +84,13 @@ services:
 
   # Define a "Grafana" service
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.3
     user: "0"
     volumes:
       - ./grafana/grafana_data:/var/lib/grafana
+      - ./conf/grafana.ini:/etc/grafana/grafana.ini
+      - ./conf/provisioning:/etc/grafana/provisioning
+      - ./conf/metrics-dashboard.json:/etc/grafana/dashboards/metrics-dashboard.json
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
