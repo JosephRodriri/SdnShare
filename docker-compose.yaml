@@ -11,9 +11,11 @@ services:
      - INFLUXDB_POLLTIME=30
      - PROMETHEUS_POLLTIME=30
 #    command: "scripts/learning_switch_tree.py --observe-links"
-    command: 
-      - scripts/dc_switch_1.py
-      - --observe-links
+#    command: 
+#      - scripts/dc_switch_1.py
+#      - --observe-links
+    command: "scripts/dc_switch_1.py scripts/monitor_influxdb.py \
+          scripts/monitor_graphite.py scripts/monitor_prometheus.py --observe-links"
     volumes:
      - ./scripts:/home/auser/scripts
     ports:
@@ -41,7 +43,7 @@ services:
   graphite:
     image: graphiteapp/graphite-statsd
     volumes:
-     - ./graphite/conf:/opt/graphite/conf
+     - ./conf/carbon.conf:/opt/graphite/conf/carbon.conf
      - ./conf/storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf
      - ./conf/storage-aggregation.conf:/opt/graphite/conf/storage-aggregation.conf
      - ./graphite/storage:/opt/graphite/storage
@@ -56,6 +58,7 @@ services:
   # Define a "Prometheus" service
   prometheus:
     image: prom/prometheus
+    user: "0"
     volumes:
      - ./scripts/prometheus.yaml:/etc/prometheus/prometheus.yml
      - ./prometheus:/prometheus
@@ -85,7 +88,6 @@ services:
     user: "0"
     volumes:
       - ./grafana/grafana_data:/var/lib/grafana
-      - ./grafana/grafana_conf/grafana.ini:/etc/grafana/grafana.ini
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
