@@ -14,8 +14,7 @@ services:
 #    command: 
 #      - scripts/dc_switch_1.py
 #      - --observe-links
-    command: "scripts/dc_switch_1.py scripts/monitor_influxdb.py \
-          scripts/monitor_graphite.py scripts/monitor_prometheus.py --observe-links"
+    command: "scripts/dc_switch_1.py scripts/monitor_influxdb.py scripts/monitor_graphite.py scripts/monitor_prometheus.py --observe-links"
     volumes:
      - ./scripts:/home/auser/scripts
     ports:
