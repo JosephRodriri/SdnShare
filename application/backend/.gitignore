@@ -1,5 +1,5 @@
-HELP.md
-Backend.md
+../docs/docs_backend/HELP.md
+../docs/docs_backend/Backend.md
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

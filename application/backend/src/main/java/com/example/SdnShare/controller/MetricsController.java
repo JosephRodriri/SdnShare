@@ -21,6 +21,7 @@ class MetricsController {
     private final PortMetricRepository portMetricRepository;
     private final MetricsCollectorService collectorService;
 
+    //  Metricas de un switch
     @GetMapping("/ports/{switchId}")
     public List<PortMetric> getPortMetrics(
             @PathVariable String switchId,
@@ -30,6 +31,7 @@ class MetricsController {
         return portMetricRepository.findRecentBySwitchId(switchId, since);
     }
 
+    // Historial con rango de fechas
     @GetMapping("/ports/{switchId}/{portId}")
     public List<PortMetric> getPortHistory(
             @PathVariable String switchId,
@@ -42,6 +44,7 @@ class MetricsController {
                         switchId, portId, from, to);
     }
 
+    // Último valor
     @GetMapping("/ports/{switchId}/{portId}/latest")
     public ResponseEntity<PortMetric> getLatestMetric(
             @PathVariable String switchId,

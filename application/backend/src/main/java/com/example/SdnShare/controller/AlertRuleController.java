@@ -15,20 +15,24 @@ import java.util.Map;
 @RequestMapping("/api/alert-rules")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
+// Reglas de alerta
 class AlertRuleController {
 
     private final AlertRuleRepository alertRuleRepository;
 
+    //Todas las reglas
     @GetMapping
     public List<AlertRule> getAll() {
         return alertRuleRepository.findAll();
     }
 
+    // Crear regla
     @PostMapping
     public AlertRule create(@RequestBody AlertRule rule) {
         return alertRuleRepository.save(rule);
     }
 
+    //Actualizar
     @PutMapping("/{id}")
     public ResponseEntity<AlertRule> update(
             @PathVariable Long id,
@@ -40,6 +44,7 @@ class AlertRuleController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // Eliminar regla
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!alertRuleRepository.existsById(id)) return ResponseEntity.notFound().build();
@@ -47,6 +52,7 @@ class AlertRuleController {
         return ResponseEntity.noContent().build();
     }
 
+    //Activar/desactivar
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<AlertRule> toggle(@PathVariable Long id) {
         return alertRuleRepository.findById(id).map(rule -> {

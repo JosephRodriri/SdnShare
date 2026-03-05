@@ -23,16 +23,19 @@ class TopologyController {
     private final SwitchRepository switchRepository;
     private final HostRepository hostRepository;
 
+    // Todos los switches
     @GetMapping("/switches")
     public List<Switch> getAllSwitches() {
         return switchRepository.findAll();
     }
 
+    //  Switches activos
     @GetMapping("/switches/active")
     public List<Switch> getActiveSwitches() {
         return switchRepository.findByIsActiveTrue();
     }
 
+   //  Switches por id
     @GetMapping("/switches/{switchId}")
     public ResponseEntity<Switch> getSwitch(@PathVariable String switchId) {
         return switchRepository.findBySwitchId(switchId)
@@ -40,16 +43,19 @@ class TopologyController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    //Todos los hosts
     @GetMapping("/hosts")
     public List<Host> getAllHosts() {
         return hostRepository.findAll();
     }
 
+    // Switches activos
     @GetMapping("/hosts/active")
     public List<Host> getActiveHosts() {
         return hostRepository.findByIsActiveTrue();
     }
 
+    // buscar host por nombre
     @GetMapping("/hosts/{name}")
     public ResponseEntity<Host> getHost(@PathVariable String name) {
         return hostRepository.findByName(name)
@@ -58,6 +64,7 @@ class TopologyController {
     }
 
     // Endpoint para que Ryu notifique cambios de topología
+    // Actualizar estado (desde Ryu)
     @PostMapping("/switches/{switchId}/status")
     public ResponseEntity<?> updateSwitchStatus(
             @PathVariable String switchId,
