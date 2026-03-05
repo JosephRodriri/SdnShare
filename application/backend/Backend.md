@@ -8,34 +8,6 @@ Complementa Grafana con detección de anomalías, historial y WebSocket.
 - **PostgreSQL 16** — Persistencia de eventos y métricas
 - **WebFlux WebClient** — Polling a InfluxDB y Prometheus
 
-## Estructura del proyecto
-
-```
-sdn-monitor/
-├── pom.xml
-├── docker/
-│   ├── schema.sql                   # Schema PostgreSQL
-│   └── docker-compose.addon.yml     # Servicios adicionales
-└── src/main/java/com/sdn/monitor/
-    ├── SdnMonitorApplication.java   # Main + CORS
-    ├── config/
-    ├── controller/
-    │   └── Controllers.java         # TopologyController, MetricsController,
-    │                                  AnomalyController, AlertRuleController
-    ├── model/entity/
-    │   ├── Switch.java
-    │   ├── Host.java
-    │   ├── PortMetric.java
-    │   ├── Anomaly.java
-    │   └── AlertRule.java
-    ├── repository/
-    │   └── Repositories.java
-    ├── service/impl/
-    │   ├── MetricsCollectorService.java   # Polling InfluxDB + Prometheus
-    │   └── AnomalyDetectionService.java  # Detección DDoS
-    └── websocket/
-        └── SdnWebSocketHandler.java      # Alertas en tiempo real
-```
 
 ## Endpoints REST
 
