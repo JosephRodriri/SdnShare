@@ -1,4 +1,4 @@
-# Directorios de datos en tiempo de ejecución (creados por Docker)
+# ═══════════════════════ Runtime data ═══════════════════════
 grafana/grafana_data/
 graphite/storage/
 prometheus/
@@ -6,10 +6,38 @@ influxdb/data/
 influxdb/config/
 graphite/conf/
 
-# Archivos temporales de Python
+# ═══════════════════════ Python ═══════════════════════════
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
 
-# Archivos de entorno
+# ═══════════════════════ Environment ═══════════════════════
 .env
+
+# ═══════════════════════ Data (never commit) ═══════════════
+data/raw/
+data/processed/
+data/models/
+*.csv
+*.pcap
+*.pcapng
+*.pkl
+*.onnx
+*.joblib
+
+# ═══════════════════════ IDE / OS ══════════════════════════
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ═══════════════════════ Notebooks ═════════════════════════
+.ipynb_checkpoints/
