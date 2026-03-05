@@ -4,7 +4,6 @@ FROM eclipse-temurin:23-jdk AS builder
 # Set the working directory
 WORKDIR /app
 
-
 # Copia el resto del código de la aplicación
 COPY mvnw mvnw
 COPY .mvn/ .mvn/
