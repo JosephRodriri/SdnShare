@@ -122,16 +122,30 @@ fi
 echo "Using attacker=$ATTACKER (pid=$ATTACKER_PID ip=${ATTACKER_IP:-N/A})"
 echo "Using victim=$VICTIM (pid=$VICTIM_PID ip=$VICTIM_IP)"
 
+# Helper to check tool existence
+check_tool() {
+  if ! dc_exec "command -v $1 >/dev/null"; then
+    echo "❌ Error: Tool '$1' not found inside Mininet container. Install it in the Dockerfile." >&2
+    echo "   Quick fix: docker compose exec mininet apt-get update && docker compose exec mininet apt-get install -y $1" >&2
+    exit 1
+  fi
+}
+
 echo "Executing attack '$ATTACK' for ${DURATION}s..."
 case "$ATTACK" in
   icmp)
+    check_tool hping3
     dc_exec "mnexec -a $ATTACKER_PID hping3 -1 --flood $VICTIM_IP >/tmp/auto_hping.log 2>&1 & sleep $DURATION; pkill hping3 || true"
     ;;
   syn)
+    check_tool hping3
+    check_tool iperf3
     dc_exec "mnexec -a $VICTIM_PID iperf3 -s &"
     dc_exec "mnexec -a $ATTACKER_PID hping3 -S -p 5001 --flood $VICTIM_IP >/tmp/auto_hping.log 2>&1 & sleep $DURATION; pkill hping3 || true; pkill iperf3 || true"
     ;;
   udp)
+    check_tool hping3
+    check_tool iperf3
     dc_exec "mnexec -a $VICTIM_PID iperf3 -s -u &"
     dc_exec "mnexec -a $ATTACKER_PID hping3 --udp -p 5001 --flood $VICTIM_IP >/tmp/auto_hping.log 2>&1 & sleep $DURATION; pkill hping3 || true; pkill iperf3 || true"
     ;;
@@ -145,6 +159,9 @@ case "$ATTACK" in
 esac
 
 echo "Attack finished. Logs: /tmp/auto_hping.log (inside mininet container)"
+echo "--- Last logs ---"
+dc_exec "tail -n 5 /tmp/auto_hping.log 2>/dev/null || tail -n 5 /tmp/auto_ab.log 2>/dev/null || echo 'No logs found'"
+echo "-----------------"
 
 echo "To inspect victim counters:"
 echo "  PID_VICTIM=$VICTIM_PID"

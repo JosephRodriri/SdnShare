@@ -30,7 +30,7 @@ get_host_stats() {
     esac
     
     # Obtener datos del puerto completo
-    local port_data=$(docker compose exec -T mininet ovs-ofctl dump-ports $switch 2>/dev/null | grep -A 1 "port  $port:")
+    local port_data=$(docker compose exec -T mininet ovs-ofctl dump-ports $switch 2>/dev/null | grep -A 1 -E "port\s+$port:")
     
     # Extraer RX packets (primera línea)
     local switch_rx=$(echo "$port_data" | head -1 | grep -o 'rx pkts=[0-9]*' | cut -d'=' -f2)
