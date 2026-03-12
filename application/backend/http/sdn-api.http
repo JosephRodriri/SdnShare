@@ -1,0 +1,181 @@
+### Variables
+@baseUrl = http://localhost:8090
+@contentType = application/json
+
+# ============================================================
+# TOPOLOGÍA
+# ============================================================
+
+### Obtener todos los switches
+GET {{baseUrl}}/api/topology/switches
+Accept: application/json
+
+###
+
+### Obtener switches activos
+GET {{baseUrl}}/api/topology/switches/active
+Accept: application/json
+
+###
+
+### Obtener switch por ID
+GET {{baseUrl}}/api/topology/switches/21
+Accept: application/json
+
+###
+
+### Obtener todos los hosts
+GET {{baseUrl}}/api/topology/hosts
+Accept: application/json
+
+###
+
+### Actualizar estado de un switch (desde Ryu)
+POST {{baseUrl}}/api/topology/switches/21/status
+Content-Type: {{contentType}}
+
+{
+  "active": true
+}
+
+# ============================================================
+# MÉTRICAS
+# ============================================================
+
+###
+
+### Métricas del switch 21 - últimos 30 minutos
+GET {{baseUrl}}/api/metrics/ports/21?minutes=30
+Accept: application/json
+
+###
+
+### Última métrica del switch 21 puerto 3
+GET {{baseUrl}}/api/metrics/ports/21/3/latest
+Accept: application/json
+
+###
+
+### Ingestar métrica manualmente
+POST {{baseUrl}}/api/metrics/ingest
+Content-Type: {{contentType}}
+
+{
+  "switchId": "21",
+  "portId": 3,
+  "rxBytes": 1234567,
+  "txBytes": 987654,
+  "rxPackets": 1500,
+  "txPackets": 1200,
+  "txErrors": 0,
+  "rxErrors": 0,
+  "txDropped": 0,
+  "rxDropped": 0,
+  "durationSec": 60
+}
+
+# ============================================================
+# ANOMALÍAS
+# ============================================================
+
+###
+
+### Todas las anomalías
+GET {{baseUrl}}/api/anomalies
+Accept: application/json
+
+###
+
+### Solo anomalías sin resolver
+GET {{baseUrl}}/api/anomalies?unresolvedOnly=true
+Accept: application/json
+
+###
+
+### Anomalías CRITICAL sin resolver
+GET {{baseUrl}}/api/anomalies?severity=CRITICAL&unresolvedOnly=true
+Accept: application/json
+
+###
+
+### Anomalías por switch
+GET {{baseUrl}}/api/anomalies/switch/21
+Accept: application/json
+
+###
+
+### Anomalías por host
+GET {{baseUrl}}/api/anomalies/host/h1
+Accept: application/json
+
+###
+
+### Estadísticas de anomalías 24h
+GET {{baseUrl}}/api/anomalies/stats
+Accept: application/json
+
+###
+
+### Resolver una anomalía
+PATCH {{baseUrl}}/api/anomalies/1/resolve
+Content-Type: {{contentType}}
+
+{
+  "resolvedBy": "admin",
+  "note": "Ataque contenido, tráfico normalizado"
+}
+
+# ============================================================
+# ALERT RULES
+# ============================================================
+
+###
+
+### Obtener todas las reglas
+GET {{baseUrl}}/api/alert-rules
+Accept: application/json
+
+###
+
+### Crear regla de alerta
+POST {{baseUrl}}/api/alert-rules
+Content-Type: {{contentType}}
+
+{
+  "name": "DDoS Test Rule",
+  "description": "Detectar tráfico anómalo en hosts",
+  "metricType": "rx_pps",
+  "operator": ">",
+  "threshold": 800,
+  "durationSec": 60,
+  "severity": "HIGH",
+  "appliesTo": "LEAF",
+  "enabled": true
+}
+
+###
+
+### Actualizar regla
+PUT {{baseUrl}}/api/alert-rules/1
+Content-Type: {{contentType}}
+
+{
+  "name": "DDoS Test Rule",
+  "metricType": "rx_pps",
+  "operator": ">",
+  "threshold": 600,
+  "durationSec": 30,
+  "severity": "CRITICAL",
+  "appliesTo": "ALL",
+  "enabled": true
+}
+
+###
+
+### Activar o desactivar regla
+PATCH {{baseUrl}}/api/alert-rules/1/toggle
+
+###
+
+### Eliminar regla
+DELETE {{baseUrl}}/api/alert-rules/1
