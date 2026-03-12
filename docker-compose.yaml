@@ -19,12 +19,21 @@ services:
       - "6633" # OpenFlow
       - "6653" # OpenFlow
       - "8080:8080" # FlowManager GUI
+    healthcheck:
+      test: [ "CMD", "python3", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 30s
 
   # ─── Mininet ────────────────────────────────────────────
   mininet:
-    image: martimy/mininet
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mininet
     depends_on:
-      - controller
+      controller:
+        condition: service_healthy
     tty: true
     privileged: true
     environment:

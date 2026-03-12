@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════
 # SDN DDoS Detection Lab — Makefile
 # ═══════════════════════════════════════════════════════════
-.PHONY: help setup up down topo topo-clean monitor capture process train predict test lint clean
+.PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture process train predict test lint clean
 
 # Colores
 CYAN  := \033[36m
@@ -20,11 +20,15 @@ help: ## Muestra esta ayuda
 
 setup: ## Levanta servicios base (controller + mininet)
 	docker compose up -d controller mininet
+	@echo "$(CYAN)⏳ Esperando a que el controller esté listo...$(RESET)"
+	@until docker compose exec -T controller python3 -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" 2>/dev/null; do sleep 2; done
 	@echo "$(GREEN)✓ Lab SDN listo$(RESET)"
 	@echo "  FlowManager: http://localhost:8080"
 
 up: ## Levanta todos los servicios (infra + monitor)
 	docker compose --profile monitor up -d
+	@echo "$(CYAN)⏳ Esperando a que el controller esté listo...$(RESET)"
+	@until docker compose exec -T controller python3 -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" 2>/dev/null; do sleep 2; done
 	@echo "$(GREEN)✓ Lab completo listo$(RESET)"
 	@echo "  FlowManager: http://localhost:8080"
 	@echo "  Grafana:     http://localhost:3000"
@@ -33,11 +37,44 @@ up: ## Levanta todos los servicios (infra + monitor)
 down: ## Detiene todos los servicios
 	docker compose --profile monitor down
 
+restart: ## Reinicia controller + mininet (soluciona desconexiones)
+	@echo "$(CYAN)🔄 Reiniciando controller...$(RESET)"
+	docker compose restart controller
+	@echo "$(CYAN)⏳ Esperando a que el controller esté listo...$(RESET)"
+	@until docker compose exec -T controller python3 -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" 2>/dev/null; do sleep 2; done
+	docker compose exec -T mininet mn -c 2>/dev/null || true
+	@echo "$(GREEN)✓ Controller listo — ejecuta 'make topo'$(RESET)"
+
 topo: ## Inicia topología spine-leaf en Mininet
+	@echo "$(CYAN)🧹 Limpiando topología anterior...$(RESET)"
+	docker compose exec -T mininet mn -c 2>/dev/null || true
+	@echo "$(CYAN)⏳ Verificando controller...$(RESET)"
+	@until docker compose exec -T controller python3 -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" 2>/dev/null; do sleep 2; done
+	@echo "$(GREEN)✓ Controller listo — iniciando topología$(RESET)"
 	docker compose exec -it mininet ./infra/topology/mn_spineleaf_topo.py infra/configs/network_config.yaml
 
 topo-clean: ## Limpia topología Mininet
 	docker compose exec -T mininet mn -c 2>/dev/null || true
+
+# Interfaz a capturar (override: make sniff IFACE=s22-eth3)
+IFACE ?= s21-eth3
+
+sniff: ## Captura paquetes en vivo con tshark (IFACE=s21-eth3)
+	@echo "$(CYAN)🦈 tshark en $(IFACE)$(RESET)"
+	docker compose exec -T mininet tshark -l -i $(IFACE) \
+		-T fields \
+		-e frame.time_relative \
+		-e ip.src -e ip.dst \
+		-e ip.proto \
+		-e tcp.srcport -e tcp.dstport \
+		-e frame.len \
+		-e tcp.flags.str \
+		-E header=y -E separator=,
+
+sniff-save: ## Captura a PCAP en data/raw/ (IFACE=s21-eth3)
+	$(eval RUN := $(shell python3 scripts/generate_run_id.py --create-dir))
+	@echo "$(CYAN)🦈 Capturando $(IFACE) → data/raw/$(RUN)/capture.pcap$(RESET)"
+	docker compose exec -T mininet tshark -i $(IFACE) -w /root/scripts/../data/raw/$(RUN)/capture.pcap
 
 monitor: ## Abre terminal tmux con monitor DDoS
 	./open_terminal.sh
