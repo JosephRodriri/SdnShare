@@ -1,0 +1,76 @@
+# ============================================================
+# SDN Monitor - Application Properties
+# ============================================================
+
+# Server
+server.port=8090
+spring.application.name=sdn-monitor
+
+# ============================================================
+# PostgreSQL
+# ============================================================
+spring.datasource.url=jdbc:postgresql://localhost:5432/sdn_monitor
+spring.datasource.username=sdn_user
+spring.datasource.password=sdn_pass
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# Connection Pool (HikariCP)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.idle-timeout=600000
+
+# JPA
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.format_sql=true
+
+# Flyway
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+
+# ============================================================
+# InfluxDB
+# ============================================================
+sdn.influxdb.host=http://localhost:8086
+sdn.influxdb.database=ryu_monitor
+sdn.influxdb.username=root
+sdn.influxdb.password=root
+sdn.influxdb.poll-interval-ms=10000
+
+# ============================================================
+# Prometheus
+# ============================================================
+sdn.prometheus.host=http://localhost:9090
+sdn.prometheus.poll-interval-ms=15000
+
+# ============================================================
+# Ryu Controller
+# ============================================================
+sdn.ryu.host=http://localhost:8080
+
+# ============================================================
+# Anomaly Detection
+# ============================================================
+sdn.anomaly.ddos-critical-threshold=1000
+sdn.anomaly.ddos-high-threshold=500
+sdn.anomaly.check-interval-ms=5000
+
+# ============================================================
+# CORS
+# ============================================================
+cors.allowed-origins=http://localhost:3001,http://localhost:5173
+
+# ============================================================
+# Actuator
+# ============================================================
+management.endpoints.web.exposure.include=health,info,metrics
+management.endpoint.health.show-details=always
+
+# ============================================================
+# Logging
+# ============================================================
+logging.level.com.sdn.monitor=DEBUG
+logging.level.org.springframework.web.socket=INFO
+logging.level.org.hibernate.SQL=WARN
