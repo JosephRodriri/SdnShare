@@ -105,11 +105,9 @@
             <version>0.43.1</version>
         </dependency>
 
-        <!-- Flyway para migraciones -->
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
+
+
+
     </dependencies>
 
     <!-- Build -->
