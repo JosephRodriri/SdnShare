@@ -6,6 +6,7 @@ COPY infra/docker/entrypoint-mininet.sh /ENTRYPOINT.sh
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+<<<<<<< HEAD
     curl \
     dnsutils \
     ifupdown \
@@ -23,10 +24,43 @@ RUN apt-get update \
     tshark \
     x11-xserver-utils \
     xterm \
+=======
+        curl \
+        dnsutils \
+        ifupdown \
+        iperf3 \
+        iproute2 \
+        iptables \
+        iputils-ping \
+        mininet \
+        nano \
+        netcat \
+        net-tools \
+        openvswitch-switch \
+        python3-pip \
+        tcpdump \
+        x11-xserver-utils \
+        xterm \
+        hping3 \
+        nmap \
+        # slowhttptest - necesario para ataques slowloris
+        # Compilar desde código fuente ya que no está en repositorios estándar
+        build-essential \
+        libssl-dev \
+>>>>>>> 87bf8d1 (readme y ataques)
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && touch /etc/network/interfaces \
-    && chmod +x /ENTRYPOINT.sh
+    && chmod +x /ENTRYPOINT.sh \
+    # Descargar y compilar slowhttptest
+    && cd /tmp \
+    && git clone https://github.com/shekyan/slowhttptest.git \
+    && cd slowhttptest \
+    && ./configure \
+    && make \
+    && make install \
+    && cd / \
+    && rm -rf /tmp/slowhttptest
 
 RUN pip3 install --break-system-packages mininet pyaml
 

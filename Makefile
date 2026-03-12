@@ -1,11 +1,17 @@
-# ═══════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
 # SDN DDoS Detection Lab — Makefile
+<<<<<<< HEAD
 # ═══════════════════════════════════════════════════════════
 .PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture process train predict test lint clean
+=======
+# ═══════════════════════════════════════════════════════════════════════════
+.PHONY: help init setup up down topo topo-clean monitor capture process train predict test lint clean
+>>>>>>> 87bf8d1 (readme y ataques)
 
 # Colores
 CYAN  := \033[36m
 GREEN := \033[32m
+YELLOW := \033[33m
 RESET := \033[0m
 
 help: ## Muestra esta ayuda
@@ -15,6 +21,18 @@ help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-15s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
+
+# ─── Inicialización ─────────────────────────────────────────
+
+init: ## Inicializa el proyecto (copia .env, crea directorios)
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "$(GREEN)✓ Archivo .env creado desde .env.example$(RESET)"; \
+	else \
+		echo "$(YELLOW)⚠️  .env ya existe, no se sobreescribirá$(RESET)"; \
+	fi
+	@mkdir -p data/raw data/processed data/models
+	@echo "$(GREEN)✓ Directorios de datos creados$(RESET)"
 
 # ─── Infraestructura ──────────────────────────────────────
 
@@ -89,7 +107,7 @@ capture: ## Inicia captura de datos (genera run_id automático)
 	@echo "$(GREEN)✓ Directorio de captura creado en data/raw/$(RUN_ID)$(RESET)"
 	@echo "  Inicia la captura manualmente y guarda los datos en ese directorio"
 
-# ─── ML (futuro) ──────────────────────────────────────────
+# ─── ML (futuro) ─────────────────────────────────────────
 
 train: ## Entrena modelo ML
 	@echo "⚠️  Aún no implementado. Ver ml/train.py"
@@ -97,7 +115,7 @@ train: ## Entrena modelo ML
 predict: ## Ejecuta inferencia
 	@echo "⚠️  Aún no implementado. Ver ml/predict.py"
 
-# ─── Calidad ──────────────────────────────────────────────
+# ─── Calidad ─────────────────────────────────────────────
 
 test: ## Ejecuta tests
 	python3 -m pytest tests/ -v

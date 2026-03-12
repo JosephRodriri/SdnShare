@@ -1,16 +1,72 @@
-# Dependencias del Proyecto SDN DDoS Detection
+# ═══════════════════════════════════════════════════════════════════════════
+# SDN DDoS Detection Lab - Requerimientos Completos
+# ═══════════════════════════════════════════════════════════════════════════
+# Este archivo contiene TODAS las dependencias necesarias para ejecutar el
+# proyecto en una máquina limpia. Instalar con: pip install -r requirements.txt
+# ═══════════════════════════════════════════════════════════════════════════
 
-# Controlador SDN y Red
-ryu>=4.34
-eventlet>=0.30.0
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTROLADOR SDN Y RED
+# ─────────────────────────────────────────────────────────────────────────────
+ryu>=4.34                    # Controlador SDN Ryu
+eventlet>=0.30.0             # Biblioteca async I/O requerida por Ryu
+mininet>=2.3.0               # Emulador de red para SDN
 
-# Manejo de Datos y ML
-numpy>=1.21.0
-pandas>=1.3.0
-scikit-learn>=1.0.0
-joblib>=1.1.0
+# ─────────────────────────────────────────────────────────────────────────────
+# MANEJO DE DATOS Y CONFIGURACIÓN
+# ─────────────────────────────────────────────────────────────────────────────
+PyYAML>=6.0                  # Parsing de archivos de configuración YAML
+pydantic>=2.0                # Validación de datos y modelos
+python-dotenv>=1.0.0         # Variables de entorno desde .env
 
-# Utilidades y Visualización
-PyYAML>=6.0
-requests>=2.26.0
-matplotlib>=3.4.0
+# ─────────────────────────────────────────────────────────────────────────────
+# CIENCIA DE DATOS Y ML
+# ─────────────────────────────────────────────────────────────────────────────
+numpy>=1.21.0                # Computación numérica
+pandas>=1.3.0                # Manipulación y análisis de datos
+scikit-learn>=1.0.0          # Machine Learning
+joblib>=1.1.0               # Serialización de modelos ML
+matplotlib>=3.4.0           # Visualización de datos
+seaborn>=0.12.0             # Visualización estadística
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONITOREO Y BASES DE DATOS
+# ─────────────────────────────────────────────────────────────────────────────
+graphyte>=1.6.0              # Cliente Python para Graphite
+influxdb>=5.3.0              # Cliente InfluxDB v1
+influxdb-client>=1.40.0      # Cliente InfluxDB v2
+prometheus-client>=0.14.0    # Cliente Prometheus
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WEB Y WSGI
+# ─────────────────────────────────────────────────────────────────────────────
+webob>=1.8.6                 # Objetos Request/Response WSGI (requerido por Ryu)
+werkzeug>=2.0.0              # WSGI utilities
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UTILIDADES Y HERRAMIENTAS
+# ─────────────────────────────────────────────────────────────────────────────
+requests>=2.26.0             # HTTP client
+urllib3>=1.26.0              # HTTP library
+certifi>=2021.10.0           # Certificados SSL
+uritemplate>=4.1.0           # URI templates
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DESARROLLO Y TESTING
+# ─────────────────────────────────────────────────────────────────────────────
+pytest>=7.0.0                # Framework de testing
+pytest-cov>=3.0.0            # Coverage para tests
+ruff>=0.1.0                  # Linter rápido
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTEBOOKS Y ANÁLISIS INTERACTIVO
+# ─────────────────────────────────────────────────────────────────────────────
+jupyter>=1.0.0               # Jupyter Notebook
+ipykernel>=6.0.0             # Kernel IPython para Jupyter
+ipython>=8.0.0               # Shell interactivo
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIAS ADICIONALES DE RYU
+# ─────────────────────────────────────────────────────────────────────────────
+ovs>=2.5.0                   # Open vSwitch Python bindings
+netaddr>=0.8.0               # Manipulación de direcciones de red

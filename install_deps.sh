@@ -57,6 +57,7 @@ install_system_deps() {
     echo "Esto puede tardar varios minutos."
 
     # Paquetes identificados en los scripts del proyecto
+    # Herramientas de red para ataques y pruebas
     PACKAGES=(
         git
         make
@@ -67,10 +68,14 @@ install_system_deps() {
         python3
         python3-pip
         python3-venv
+        # Herramientas de ataque (necesarias para auto_attack.sh)
         hping3
         iperf3
         nmap
         apache2-utils  # Para la herramienta 'ab'
+        # Herramientas adicionales para ataques específicos
+        build-essential
+        libssl-dev
         curl
         wget
     )
