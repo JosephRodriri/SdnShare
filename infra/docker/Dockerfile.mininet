@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:22.04
 
 WORKDIR /root
 
@@ -6,25 +6,6 @@ COPY infra/docker/entrypoint-mininet.sh /ENTRYPOINT.sh
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-<<<<<<< HEAD
-    curl \
-    dnsutils \
-    ifupdown \
-    iperf3 \
-    iproute2 \
-    iptables \
-    iputils-ping \
-    mininet \
-    nano \
-    netcat-openbsd \
-    net-tools \
-    openvswitch-switch \
-    python3-pip \
-    tcpdump \
-    tshark \
-    x11-xserver-utils \
-    xterm \
-=======
         curl \
         dnsutils \
         ifupdown \
@@ -34,25 +15,27 @@ RUN apt-get update \
         iputils-ping \
         mininet \
         nano \
-        netcat \
+        netcat-openbsd \
         net-tools \
         openvswitch-switch \
         python3-pip \
         tcpdump \
+        tshark \
         x11-xserver-utils \
         xterm \
         hping3 \
         nmap \
-        # slowhttptest - necesario para ataques slowloris
-        # Compilar desde código fuente ya que no está en repositorios estándar
         build-essential \
         libssl-dev \
->>>>>>> 87bf8d1 (readme y ataques)
+        git \
+        autoconf \
+        automake \
+        libtool \
+        pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && touch /etc/network/interfaces \
     && chmod +x /ENTRYPOINT.sh \
-    # Descargar y compilar slowhttptest
     && cd /tmp \
     && git clone https://github.com/shekyan/slowhttptest.git \
     && cd slowhttptest \
@@ -67,4 +50,3 @@ RUN pip3 install --break-system-packages mininet pyaml
 EXPOSE 6633 6653 6640
 
 ENTRYPOINT ["/ENTRYPOINT.sh"]
-

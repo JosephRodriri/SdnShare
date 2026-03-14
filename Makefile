@@ -1,12 +1,6 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # SDN DDoS Detection Lab — Makefile
-<<<<<<< HEAD
 # ═══════════════════════════════════════════════════════════
-.PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture process train predict test lint clean
-=======
-# ═══════════════════════════════════════════════════════════════════════════
-.PHONY: help init setup up down topo topo-clean monitor capture process train predict test lint clean
->>>>>>> 87bf8d1 (readme y ataques)
 
 # Colores
 CYAN  := \033[36m
