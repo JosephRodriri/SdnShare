@@ -39,8 +39,8 @@ TABLE0 = 0
 MIN_PRIORITY = 0
 LOW_PRIORITY = 100
 
-# Set idle_time=0 to make flow entries permenant
-IDLE_TIME = 30
+# Set idle_time=0 to make flow entries permanent
+IDLE_TIME = 0
 
 
 class SpineLeaf1(BaseSwitch):
