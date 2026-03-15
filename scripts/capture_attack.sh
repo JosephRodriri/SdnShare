@@ -4,7 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
+export PROJECT_ROOT
 python3 - <<'EOF'
 import json, urllib.request, base64, os
 

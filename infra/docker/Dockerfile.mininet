@@ -6,6 +6,7 @@ COPY infra/docker/entrypoint-mininet.sh /ENTRYPOINT.sh
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
         curl \
         dnsutils \
         ifupdown \
@@ -45,7 +46,7 @@ RUN apt-get update \
     && cd / \
     && rm -rf /tmp/slowhttptest
 
-RUN pip3 install mininet pyaml
+RUN pip3 install pyaml
 
 EXPOSE 6633 6653 6640
 

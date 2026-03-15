@@ -7,6 +7,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 echo "🚀 Iniciando lab DDoS con tmux desde: $PROJECT_ROOT..."
 
 # Crear sesión tmux
+tmux has-session -t ddos_lab 2>/dev/null && tmux kill-session -t ddos_lab
 tmux new-session -d -s ddos_lab
 
 # Panel 0: Monitor

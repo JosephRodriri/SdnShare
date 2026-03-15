@@ -46,6 +46,7 @@ services:
       - ./infra/configs:/root/infra/configs
       - ./infra/attacks:/root/infra/attacks
       - ./scripts:/root/scripts
+      - ./data:/root/data
 
   # ─── Graphite ───────────────────────────────────────────
   graphite:
