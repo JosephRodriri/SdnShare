@@ -1,6 +1,8 @@
 # ═══════════════════════════════════════════════════════════
 # SDN DDoS Detection Lab — Makefile
 # ═══════════════════════════════════════════════════════════
+include scripts/Makefile
+
 .PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture process train predict test lint clean
 
 # Colores
@@ -56,25 +58,6 @@ topo: ## Inicia topología spine-leaf en Mininet
 topo-clean: ## Limpia topología Mininet
 	docker compose exec -T mininet mn -c 2>/dev/null || true
 
-# Interfaz a capturar (override: make sniff IFACE=s22-eth3)
-IFACE ?= s21-eth3
-
-sniff: ## Captura paquetes en vivo con tshark (IFACE=s21-eth3)
-	@echo "$(CYAN)🦈 tshark en $(IFACE)$(RESET)"
-	docker compose exec -T mininet tshark -l -i $(IFACE) \
-		-T fields \
-		-e frame.time_relative \
-		-e ip.src -e ip.dst \
-		-e ip.proto \
-		-e tcp.srcport -e tcp.dstport \
-		-e frame.len \
-		-e tcp.flags.str \
-		-E header=y -E separator=,
-
-sniff-save: ## Captura a PCAP en data/raw/ (IFACE=s21-eth3)
-	$(eval RUN := $(shell python3 scripts/generate_run_id.py --create-dir))
-	@echo "$(CYAN)🦈 Capturando $(IFACE) → data/raw/$(RUN)/capture.pcap$(RESET)"
-	docker compose exec -T mininet tshark -i $(IFACE) -w /root/scripts/../data/raw/$(RUN)/capture.pcap
 
 monitor: ## Abre terminal tmux con monitor DDoS
 	./open_terminal.sh

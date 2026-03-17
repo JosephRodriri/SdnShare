@@ -45,7 +45,7 @@ get_host_stats() {
 # Inicializar
 clear
 echo -e "${CYAN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║     Monitor de Tráfico DDoS - SDN Lab     ║${NC}"
+echo -e "${CYAN}║     Monitor de Tráfico     ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BLUE}Inicializando monitor basado en hosts...${NC}"

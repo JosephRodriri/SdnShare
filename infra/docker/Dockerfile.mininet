@@ -6,29 +6,73 @@ COPY infra/docker/entrypoint-mininet.sh /ENTRYPOINT.sh
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    # --- Herramientas base y utilidades del sistema ---
     curl \
     dnsutils \
     ifupdown \
-    iperf3 \
     iproute2 \
     iptables \
     iputils-ping \
-    mininet \
     nano \
-    netcat-openbsd \
     net-tools \
     openvswitch-switch \
     python3-pip \
+    wget \
+    # --- Red y diagnóstico ---
+    arping \
+    dsniff \
+    ethtool \
+    fping \
+    iperf3 \
+    netcat-openbsd \
+    netsniff-ng \
+    nmap \
+    socat \
     tcpdump \
+    tcpreplay \
     tshark \
+    # --- Ataques y pentesting ---
+    hping3 \
+    macchanger \
+    ncat \
+    # --- Servidores de aplicación (tráfico normal) ---
+    apache2 \
+    lighttpd \
+    nginx \
+    # --- Tráfico y transferencia ---
+    ftp \
+    lftp \
+    rsync \
+    smbclient \
+    ssh \
+    # --- Generación de tráfico / stress ---
+    stress \
+    # --- Visualización y entorno gráfico ---
+    mininet \
     x11-xserver-utils \
     xterm \
+    # --- Utilidades de desarrollo ---
+    git \
+    jq \
+    python3-dev \
+    python3-scapy \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && touch /etc/network/interfaces \
     && chmod +x /ENTRYPOINT.sh
 
-RUN pip3 install --break-system-packages mininet pyaml
+# --- Dependencias Python ---
+RUN pip3 install --break-system-packages \
+    mininet \
+    pyaml \
+    scapy \
+    netifaces \
+    psutil \
+    requests \
+    flask \
+    numpy \
+    pandas \
+    scikit-learn
 
 EXPOSE 6633 6653 6640
 
