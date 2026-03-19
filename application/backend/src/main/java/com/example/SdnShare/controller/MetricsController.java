@@ -2,7 +2,7 @@ package com.example.SdnShare.controller;
 
 import com.example.SdnShare.model.PortMetric;
 import com.example.SdnShare.repository.PortMetricRepository;
-import com.example.SdnShare.service.MetricsCollectorService;
+import com.example.SdnShare.service.impl.MetricsCollectorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;

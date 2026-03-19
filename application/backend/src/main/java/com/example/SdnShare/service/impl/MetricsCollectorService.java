@@ -1,4 +1,4 @@
-package com.example.SdnShare.service;
+package com.example.SdnShare.service.impl;
 
 import com.example.SdnShare.model.PortMetric;
 import com.example.SdnShare.model.Switch;

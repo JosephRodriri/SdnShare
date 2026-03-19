@@ -5,10 +5,10 @@ FROM eclipse-temurin:23-jdk AS builder
 WORKDIR /app
 
 # Copia el resto del código de la aplicación
-COPY mvnw mvnw
-COPY .mvn/ .mvn/
-COPY pom.xml pom.xml
-COPY src/ src/
+COPY ../backend/mvnw mvnw
+COPY ../backend/.mvn .mvn/
+COPY ../backend/pom.xml pom.xml
+COPY ../backend/src src/
 
 # Da permisos de ejecución al wrapper (por si acaso)
 RUN chmod +x mvnw

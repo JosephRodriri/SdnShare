@@ -6,9 +6,9 @@ spring:
     name: sdn-monitor
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/sdn_monitor
-    username: sdn_user
-    password: sdn_pass
+    url: ${URL_DB}
+    username: ${USER_NAME}
+    password: ${PASSWORD_DB}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -20,9 +20,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
+
 
 # Configuración SDN externas
 sdn:
