@@ -1,4 +1,6 @@
 package com.example.SdnShare.enums;
 
-public enum Role {
+public  enum Role {
+    USER,
+    ADMIN
 }

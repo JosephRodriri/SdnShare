@@ -1,0 +1,63 @@
+# corsConfig
+# REGISTER
+# corsConfig
+
+### Registrar usuario ADMIN
+POST http://localhost:8090/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Breiner",
+  "lastName": "Martinez",
+  "email": "breinersmartinezmunoz@gmail.com",
+  "password": "admin123",
+  "phoneNumber": "3001234567",
+  "direction": "Cali, Colombia",
+  "role": "ADMIN"
+}
+
+###
+
+### Registrar usuario normal
+POST http://localhost:8090/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Joseph",
+  "lastName": "Rodriguez",
+  "email": "joseph@sdn.com",
+  "password": "user123",
+  "phoneNumber": "3109876543",
+  "direction": "Medellín, Colombia",
+  "role": "USER"
+}
+
+# corsConfig
+# LOGIN
+# corsConfig
+
+### Login admin — guarda el token automáticamente
+# @name login
+POST http://localhost:8090/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "breinersmartinezmunoz@gmail.com",
+  "password": "admin123"
+}
+
+> {% client.global.set("authToken", response.body.token); %}
+
+###
+
+### Login usuario normal
+# @name loginUser
+POST http://localhost:8090/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "joseph@sdn.com",
+  "password": "user123"
+}
+
+> {% client.global.set("authToken", response.body.token); %}

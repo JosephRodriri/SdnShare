@@ -1,0 +1,106 @@
+### Variables globales
+@baseUrl = http://localhost:8090
+@contentType = application/json
+
+# corsConfig
+# AUTH — Obtener token automáticamente
+# corsConfig
+
+### 1. Register - Crear usuario admin
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+  "firstName": "Admin",
+  "lastName": "SDN",
+  "email": "admin@sdn.com",
+  "password": "admin123",
+  "phoneNumber": "3001234567",
+  "direction": "Bogotá",
+  "role": "ADMIN"
+}
+
+###
+
+### 2. Login - Obtener token (ejecutar primero)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@sdn.com",
+  "password": "admin123"
+}
+
+> {% client.global.set("authToken", response.body.token); %}
+
+###
+
+# corsConfig
+# USERS
+# corsConfig
+
+### Obtener todos los usuarios (ADMIN)
+GET {{baseUrl}}/api/users
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Obtener mi perfil
+GET {{baseUrl}}/api/users/me
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Obtener usuario por ID
+GET {{baseUrl}}/api/users/{{userId}}
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Obtener usuarios activos (ADMIN)
+GET {{baseUrl}}/api/users/active
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Obtener usuarios por rol (ADMIN)
+GET {{baseUrl}}/api/users/role/ADMIN
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Actualizar usuario
+PUT {{baseUrl}}/api/users/{{userId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
+
+{
+  "firstName": "Admin",
+  "lastName": "SDN Updated",
+  "phoneNumber": "3009876543"
+}
+
+###
+
+### Desactivar usuario (ADMIN)
+PATCH {{baseUrl}}/api/users/{{userId}}/deactivate
+Authorization: Bearer {{authToken}}
+
+###
+
+### Activar usuario (ADMIN)
+PATCH {{baseUrl}}/api/users/{{userId}}/activate
+Authorization: Bearer {{authToken}}
+
+###
+
+### Eliminar usuario (ADMIN)
+DELETE {{baseUrl}}/api/users/{{userId}}
+Authorization: Bearer {{authToken}}
+

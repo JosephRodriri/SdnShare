@@ -2,63 +2,88 @@
 @baseUrl = http://localhost:8090
 @contentType = application/json
 
-# 
+#
 # TOPOLOGÍA
-# 
+#
+# corsConfig
+# TOPOLOGÍA
+# corsConfig
 
 ### Obtener todos los switches
 GET {{baseUrl}}/api/topology/switches
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Obtener switches activos
 GET {{baseUrl}}/api/topology/switches/active
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Obtener switch por ID
 GET {{baseUrl}}/api/topology/switches/21
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Obtener todos los hosts
 GET {{baseUrl}}/api/topology/hosts
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
-### Actualizar estado de un switch (desde Ryu)
+### Obtener host por nombre
+GET {{baseUrl}}/api/topology/hosts/h1
+Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Actualizar estado de un switch
 POST {{baseUrl}}/api/topology/switches/21/status
 Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
 
 {
   "active": true
 }
 
-# 
+# corsConfig
 # MÉTRICAS
-# 
+# corsConfig
 
 ###
 
 ### Métricas del switch 21 - últimos 30 minutos
 GET {{baseUrl}}/api/metrics/ports/21?minutes=30
 Accept: application/json
+Authorization: Bearer {{authToken}}
+
+###
+
+### Métricas del switch 21 - últimas 24 horas
+GET {{baseUrl}}/api/metrics/ports/21?minutes=1440
+Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Última métrica del switch 21 puerto 3
 GET {{baseUrl}}/api/metrics/ports/21/3/latest
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
-### Ingestar métrica manualmente
+### Ingestar métrica manualmente (desde Ryu)
 POST {{baseUrl}}/api/metrics/ingest
 Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
 
 {
   "switchId": "21",
@@ -74,72 +99,81 @@ Content-Type: {{contentType}}
   "durationSec": 60
 }
 
-# 
+# corsConfig
 # ANOMALÍAS
-# 
+# corsConfig
 
 ###
 
 ### Todas las anomalías
 GET {{baseUrl}}/api/anomalies
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Solo anomalías sin resolver
 GET {{baseUrl}}/api/anomalies?unresolvedOnly=true
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Anomalías CRITICAL sin resolver
 GET {{baseUrl}}/api/anomalies?severity=CRITICAL&unresolvedOnly=true
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Anomalías por switch
 GET {{baseUrl}}/api/anomalies/switch/21
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Anomalías por host
 GET {{baseUrl}}/api/anomalies/host/h1
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
-### Estadísticas de anomalías 24h
+### Estadísticas 24h
 GET {{baseUrl}}/api/anomalies/stats
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
-### Resolver una anomalía
+### Resolver anomalía
 PATCH {{baseUrl}}/api/anomalies/1/resolve
 Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
 
 {
   "resolvedBy": "admin",
   "note": "Ataque contenido, tráfico normalizado"
 }
 
-# 
+# corsConfig
 # ALERT RULES
-# 
+# corsConfig
 
 ###
 
 ### Obtener todas las reglas
 GET {{baseUrl}}/api/alert-rules
 Accept: application/json
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Crear regla de alerta
 POST {{baseUrl}}/api/alert-rules
 Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
 
 {
   "name": "DDoS Test Rule",
@@ -158,6 +192,7 @@ Content-Type: {{contentType}}
 ### Actualizar regla
 PUT {{baseUrl}}/api/alert-rules/1
 Content-Type: {{contentType}}
+Authorization: Bearer {{authToken}}
 
 {
   "name": "DDoS Test Rule",
@@ -174,8 +209,10 @@ Content-Type: {{contentType}}
 
 ### Activar o desactivar regla
 PATCH {{baseUrl}}/api/alert-rules/1/toggle
+Authorization: Bearer {{authToken}}
 
 ###
 
 ### Eliminar regla
 DELETE {{baseUrl}}/api/alert-rules/1
+Authorization: Bearer {{authToken}}

@@ -1,17 +1,9 @@
-package com.example.SdnShare.config;
+package com.example.SdnShare.config.webConfiguration;
 
 import com.example.SdnShare.websocket.SdnWebSocketHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.stereotype.Component;
-import org.springframework.web.socket.*;
 import org.springframework.web.socket.config.annotation.*;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @EnableWebSocket
