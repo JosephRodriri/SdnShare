@@ -1,16 +1,13 @@
 server:
   port: 8090
-
 spring:
   application:
     name: sdn-monitor
-
   datasource:
     url: ${URL_DB}
     username: ${USER_NAME}
     password: ${PASSWORD_DB}
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,28 +17,21 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-
-
-# Configuración SDN externas
 sdn:
   influxdb:
     host: http://localhost:8086
     database: ryu_monitor
-    poll-interval-ms: 10000       # cada 10 segundos
-
+    poll-interval-ms: 10000
   prometheus:
     host: http://localhost:9090
-    poll-interval-ms: 15000       # cada 15 segundos
-
+    poll-interval-ms: 15000
   ryu:
-    host: http://localhost:8080   # FlowManager / Ryu REST API
-
+    host: http://localhost:8080
   anomaly:
-    ddos-critical-threshold: 1000  # pps
-    ddos-high-threshold: 500       # pps
-    check-interval-ms: 5000        # cada 5 segundos
+    ddos-critical-threshold: 1000
+    ddos-high-threshold: 500
+    check-interval-ms: 5000
 
-# CORS para React
 cors:
   allowed-origins: "http://localhost:3001"
 
