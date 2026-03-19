@@ -6,6 +6,7 @@ import com.example.SdnShare.repository.PortMetricRepository;
 import com.example.SdnShare.repository.SwitchRepository;
 
 import com.example.SdnShare.websocket.SdnWebSocketHandler;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,44 +40,87 @@ public class MetricsCollectorService {
     @Value("${sdn.prometheus.host}")
     private String prometheusHost;
 
-    private final WebClient webClient = WebClient.builder().build();
+    // WebClients inicializados en @PostConstruct con baseUrl correcta
+    private WebClient influxClient;
+    private WebClient prometheusClient;
 
-    /**
-     * Polling a InfluxDB cada 10 segundos.
-     * Consulta port_stats de todos los switches.
-     */
+    @PostConstruct
+    public void init() {
+        this.influxClient     = WebClient.builder().baseUrl(influxHost).build();
+        this.prometheusClient = WebClient.builder().baseUrl(prometheusHost).build();
+        log.info("=== MetricsCollectorService iniciado ===");
+        log.info("=== InfluxDB  : {}", influxHost);
+        log.info("=== Prometheus: {}", prometheusHost);
+    }
+
+    
+    // POLLING INFLUXDB
+    
+
     @Scheduled(fixedDelayString = "${sdn.influxdb.poll-interval-ms:10000}")
     public void collectFromInfluxDB() {
-        log.debug("Polling InfluxDB...");
+        log.info(">>> [InfluxDB] Polling...");
 
-        // Query: últimas métricas de cada switch+puerto
         String query = "SELECT last(rx_bytes), last(tx_bytes), last(rx_packets), " +
                 "last(tx_packets), last(tx_errors), last(rx_errors) " +
                 "FROM port_stats GROUP BY datapath, port_no";
 
-        webClient.get()
-                .uri(influxHost + "/query", uriBuilder -> uriBuilder
+        // CORRECTO - baseUrl ya está en el cliente, solo agregar path y params
+        influxClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/query")
                         .queryParam("db", influxDatabase)
                         .queryParam("q", query)
                         .build())
                 .retrieve()
                 .bodyToMono(Map.class)
                 .subscribe(
-                        response -> parseAndSaveInfluxResponse(response),
-                        error -> log.error("InfluxDB polling error: {}", error.getMessage())
+                        response -> {
+                            log.info(">>> [InfluxDB] Respuesta recibida");
+                            parseAndSaveInfluxResponse(response);
+                        },
+                        error -> log.error(">>> [InfluxDB] Error: {}", error.getMessage())
                 );
     }
 
-    /**
-     * Recibe métricas directamente del controlador Ryu via POST.
-     * El controlador puede enviar stats cuando las recibe de los switches.
-     */
+    
+    // POLLING PROMETHEUS
+    
+
+    @Scheduled(fixedDelayString = "${sdn.prometheus.poll-interval-ms:15000}")
+    public void collectFromPrometheus() {
+        log.info(">>> [Prometheus] Polling...");
+
+        List<String> datapaths = List.of("11", "12", "21", "22", "23");
+        datapaths.forEach(dpId -> {
+            String query = String.format(
+                    "ryu_flow_count{datapath_id=\"%s\",table_id=\"0\"}", dpId);
+
+            // CORRECTO
+            prometheusClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/v1/query")
+                            .queryParam("query", query)
+                            .build(true))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .subscribe(
+                            response -> log.info(">>> [Prometheus] switch={} → {}", dpId, response),
+                            error -> log.error(">>> [Prometheus] Error switch={}: {}", dpId, error.getMessage())
+                    );
+        });
+    }
+
+    
+    // INGESTA DIRECTA (desde Ryu vía POST)
+
+
     public PortMetric ingestPortMetric(String switchId, Integer portId,
-                                       Long rxBytes, Long txBytes,
-                                       Long rxPackets, Long txPackets,
-                                       Integer txErrors, Integer rxErrors,
-                                       Integer txDropped, Integer rxDropped,
-                                       Integer durationSec) {
+                                       Long rxBytes,    Long txBytes,
+                                       Long rxPackets,  Long txPackets,
+                                       Long txErrors,   Long rxErrors,   //  Long
+                                       Long txDropped,  Long rxDropped,
+                                       Integer durationSec)  {
 
         String switchType = resolveSwitchType(switchId);
 
@@ -97,6 +141,8 @@ public class MetricsCollectorService {
                 .build();
 
         PortMetric saved = portMetricRepository.save(metric);
+        log.info(">>> [DB] Métrica guardada → switch={} port={} rx={} tx={}",
+                switchId, portId, rxBytes, txBytes);
 
         // Actualizar last_seen del switch
         switchRepository.findBySwitchId(switchId).ifPresent(sw -> {
@@ -105,69 +151,78 @@ public class MetricsCollectorService {
             switchRepository.save(sw);
         });
 
-        // Broadcast al frontend via WebSocket
         webSocketHandler.broadcastPortMetric(saved);
-
         return saved;
     }
 
-    /**
-     * Polling a Prometheus cada 15 segundos para flow counts.
-     */
-    @Scheduled(fixedDelayString = "${sdn.prometheus.poll-interval-ms:15000}")
-    public void collectFromPrometheus() {
-        log.debug("Polling Prometheus...");
+    
+    // PARSEO RESPUESTA INFLUXDB
 
-        // Consultar ryu_flow_count por datapath
-        List<String> datapaths = List.of("11", "12", "21", "22", "23");
-        datapaths.forEach(dpId -> {
-            String query = String.format("ryu_flow_count{datapath_id=\"%s\",table_id=\"0\"}", dpId);
-            webClient.get()
-                    .uri(prometheusHost + "/api/v1/query", uriBuilder -> uriBuilder
-                            .queryParam("query", query)
-                            .build())
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .subscribe(
-                            response -> log.debug("Prometheus response for {}: {}", dpId, response),
-                            error -> log.error("Prometheus polling error for {}: {}", dpId, error.getMessage())
-                    );
-        });
-    }
 
     private void parseAndSaveInfluxResponse(Map<?, ?> response) {
-        // Parsear respuesta InfluxDB y guardar en PostgreSQL
-        // La respuesta tiene estructura: {results: [{series: [{tags: {datapath, port_no}, values: [...]}]}]}
         try {
             var results = (List<?>) response.get("results");
-            if (results == null || results.isEmpty()) return;
+            if (results == null || results.isEmpty()) {
+                log.warn(">>> [InfluxDB] Sin resultados");
+                return;
+            }
 
             var result = (Map<?, ?>) results.get(0);
             var series = (List<?>) result.get("series");
-            if (series == null) return;
+
+            if (series == null) {
+                log.warn(">>> [InfluxDB] Series null — ¿Mininet está corriendo?");
+                return;
+            }
+
+            log.info(">>> [InfluxDB] {} series encontradas", series.size());
 
             for (Object s : series) {
-                Map<?, ?> serie = (Map<?, ?>) s;
-                Map<?, ?> tags = (Map<?, ?>) serie.get("tags");
-                List<?> values = (List<?>) serie.get("values");
+                try {
+                    Map<?, ?> serie  = (Map<?, ?>) s;
+                    Map<?, ?> tags   = (Map<?, ?>) serie.get("tags");
+                    List<?>   values = (List<?>) serie.get("values");
 
-                if (tags == null || values == null || values.isEmpty()) continue;
+                    if (tags == null || values == null || values.isEmpty()) continue;
 
-                String switchId = String.valueOf(tags.get("datapath"));
-                Integer portId  = Integer.parseInt(String.valueOf(tags.get("port_no")));
-                List<?> row     = (List<?>) values.get(0);
+                    String switchId    = String.valueOf(tags.get("datapath"));
+                    String portNoStr   = String.valueOf(tags.get("port_no"));
 
-                // row: [timestamp, rx_bytes, tx_bytes, rx_packets, tx_packets, tx_errors, rx_errors]
-                ingestPortMetric(switchId, portId,
-                        toLong(row.get(1)), toLong(row.get(2)),
-                        toLong(row.get(3)), toLong(row.get(4)),
-                        toInt(row.get(5)),  toInt(row.get(6)),
-                        0, 0, 0);
+                    //  Filtrar puertos especiales de OpenFlow
+                    // 4294967294 = 0xFFFFFFFE = OFPP_LOCAL
+                    // 4294967293 = 0xFFFFFFFD = OFPP_NORMAL
+                    // 4294967040 = 0xFFFFFF00 = OFPP_MAX
+                    long portNoLong = Long.parseLong(portNoStr);
+                    if (portNoLong > 65535) {
+                        log.debug(">>> [InfluxDB] Saltando puerto especial OpenFlow: {}", portNoStr);
+                        continue;  // ← saltar en lugar de lanzar excepción
+                    }
+
+                    Integer portId = (int) portNoLong;
+                    List<?> row    = (List<?>) values.get(0);
+
+                    log.info(">>> [InfluxDB] switch={} port={} rx_bytes={} tx_bytes={}",
+                            switchId, portId, row.get(1), row.get(2));
+
+                    ingestPortMetric(switchId, portId,
+                            toLong(row.get(1)), toLong(row.get(2)),
+                            toLong(row.get(3)), toLong(row.get(4)),
+                            toLong(row.get(5)), toLong(row.get(6)),
+                            0L, 0L, 0);
+
+                } catch (Exception e) {
+                    log.warn(">>> [InfluxDB] Error procesando serie: {} — continuando", e.getMessage());
+                }
             }
+
         } catch (Exception e) {
-            log.error("Error parsing InfluxDB response: {}", e.getMessage());
+            log.error(">>> [InfluxDB] Error parseando respuesta: {}", e.getMessage(), e);
         }
     }
+
+    
+    // HELPERS
+    
 
     private String resolveSwitchType(String switchId) {
         return switchRepository.findBySwitchId(switchId)
@@ -177,13 +232,13 @@ public class MetricsCollectorService {
 
     private Long toLong(Object val) {
         if (val == null) return 0L;
-        if (val instanceof Number) return ((Number) val).longValue();
+        if (val instanceof Number n) return n.longValue();
         return Long.parseLong(val.toString());
     }
 
     private Integer toInt(Object val) {
         if (val == null) return 0;
-        if (val instanceof Number) return ((Number) val).intValue();
+        if (val instanceof Number n) return n.intValue();
         return Integer.parseInt(val.toString());
     }
 }

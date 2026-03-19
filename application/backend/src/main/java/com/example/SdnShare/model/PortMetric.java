@@ -38,16 +38,16 @@ public class PortMetric {
     private Long rxPackets = 0L;
 
     @Column(name = "tx_errors")
-    private Integer txErrors = 0;
+    private Long txErrors = 0L;
 
     @Column(name = "rx_errors")
-    private Integer rxErrors = 0;
+    private Long rxErrors = 0L;
 
     @Column(name = "tx_dropped")
-    private Integer txDropped = 0;
+    private Long txDropped = 0L;
 
     @Column(name = "rx_dropped")
-    private Integer rxDropped = 0;
+    private Long rxDropped = 0L;
 
     @Column(name = "duration_sec")
     private Integer durationSec = 0;

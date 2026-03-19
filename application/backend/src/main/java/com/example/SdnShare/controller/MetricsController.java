@@ -64,8 +64,8 @@ class MetricsController {
                 (Integer) body.get("portId"),
                 toLong(body.get("rxBytes")),   toLong(body.get("txBytes")),
                 toLong(body.get("rxPackets")), toLong(body.get("txPackets")),
-                toInt(body.get("txErrors")),   toInt(body.get("rxErrors")),
-                toInt(body.get("txDropped")),  toInt(body.get("rxDropped")),
+                toLong(body.get("txErrors")),   toLong(body.get("rxErrors")),
+                toLong(body.get("txDropped")),  toLong(body.get("rxDropped")),
                 toInt(body.get("durationSec"))
         );
         return ResponseEntity.ok(saved);

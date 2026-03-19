@@ -1,6 +1,7 @@
 package com.example.SdnShare.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +19,15 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SdnWebSocketHandler extends TextWebSocketHandler {
 
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Inyectar el ObjectMapper de Spring en lugar de crear uno nuevo
+    // Spring Boot auto-configura Jackson con JavaTimeModule incluido
+    private final ObjectMapper objectMapper;
+
+    //  Constructor explícito para inyección
+    public SdnWebSocketHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         sessions.put(session.getId(), session);
