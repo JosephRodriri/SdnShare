@@ -9,13 +9,16 @@ export function useWebSocket(onMessage) {
     const ws = new WebSocket(`ws://${window.location.hostname}:8090/ws/sdn`)
     wsRef.current = ws
 
-    ws.onopen    = () => console.log('[WS] Connected')
+    ws.onopen    = () => console.log('[WS] Conectado al SDN Monitor')
     ws.onmessage = (e) => {
       try { handlerRef.current(JSON.parse(e.data)) }
-      catch {}
+      catch { /* ignorar mensajes malformados */ }
     }
-    ws.onclose = () => setTimeout(connect, 3000)
-    ws.onerror = (e) => console.error('[WS] Error', e)
+    ws.onclose = () => {
+      console.log('[WS] Desconectado — reconectando en 3s...')
+      setTimeout(connect, 3000)
+    }
+    ws.onerror = (err) => console.error('[WS] Error:', err)
   }, [])
 
   useEffect(() => {
