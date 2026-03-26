@@ -33,10 +33,10 @@ public class AnomalyDetectionService {
     private final SdnWebSocketHandler webSocketHandler;
 
     @Value("${sdn.anomaly.ddos-critical-threshold:1000}")
-    private int criticalThreshold;
+    private int criticalThreshold; // umbral crítico o valor límite
 
     @Value("${sdn.anomaly.ddos-high-threshold:500}")
-    private int highThreshold;
+    private int highThreshold; // umbral alto
 
     // Mapa de últimos paquetes por switch+puerto para calcular pps
     private final Map<String, Long> lastRxPackets = new HashMap<>();

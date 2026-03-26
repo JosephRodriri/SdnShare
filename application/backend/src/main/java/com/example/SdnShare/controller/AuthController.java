@@ -23,6 +23,7 @@ public class AuthController {
     //  Las excepciones se lanzan naturalmente y el handler las captura.
 
     @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest request) {
         // Las excepciones serán capturadas automáticamente por GlobalExceptionHandler
         AuthResponse response = authService.register(request);

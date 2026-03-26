@@ -134,12 +134,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: '16px', fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', color: '#484f58' }}>
-          Sin cuenta?{' '}
-          <Link to="/register" style={{ color: '#06b6d4', textDecoration: 'none' }}>
-            Registrarse
-          </Link>
-        </p>
+
       </div>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

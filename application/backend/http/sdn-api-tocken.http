@@ -22,6 +22,26 @@ Content-Type: {{contentType}}
 
 ###
 
+### Registrar usuario normal
+
+POST http://localhost:8090/api/auth/register
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "firstName": "Joseph",
+  "lastName": "Rodriguez",
+  "email": "joseph@sdn.com",
+  "password": "user123",
+  "phoneNumber": "3109876543",
+  "direction": "Medellín, Colombia",
+  "role": "USER"
+}
+
+
+
+
+
 ### 2. Login - Obtener token (ejecutar primero)
 # @name login
 POST {{baseUrl}}/api/auth/login

@@ -87,6 +87,7 @@ public class UserController {
 
     // Eliminar un usuario de forma fisica - solo admins
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
