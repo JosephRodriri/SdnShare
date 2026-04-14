@@ -89,6 +89,7 @@ public class AnomalyDetectionService {
         String anomalyType = null;
         double metricValue = Math.max(rxPps, txPps);
 
+
         if (metricValue >= criticalThreshold) {
             severity = "CRITICAL";
             anomalyType = "DDOS";

@@ -148,7 +148,7 @@ Authorization: Bearer {{authToken}}
 ###
 
 ### Resolver anomalía
-PATCH {{baseUrl}}/api/anomalies/9/resolve
+PATCH {{baseUrl}}/api/anomalies/10/resolve
 Content-Type: {{contentType}}
 Authorization: Bearer {{authToken}}
 
