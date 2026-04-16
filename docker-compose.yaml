@@ -10,7 +10,15 @@ services:
       - INFLUXDB_HOST=influxdb
       - INFLUXDB_POLLTIME=${INFLUXDB_POLLTIME:-30}
       - PROMETHEUS_POLLTIME=${PROMETHEUS_POLLTIME:-30}
-    command: "infra/controller/dc_switch.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
+      # ── DDoS thresholds (packets per second) ──────────────────────────
+      # Lower values = more sensitive detection (good for lab demos)
+      # Raise them in production to reduce false positives
+      - DDOS_THRESH_SYN=100      # SYN packets/s from single IP
+      - DDOS_THRESH_UDP=200      # UDP packets/s from single IP
+      - DDOS_THRESH_ICMP=50      # ICMP packets/s from single IP
+      - DDOS_INTERVAL=2          # Detection window in seconds
+      - DDOS_BLOCK_TIMEOUT=120   # Seconds before block rule expires (0=permanent)
+    command: "infra/controller/dc_switch.py infra/controller/ddos_mitigator.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
     volumes:
       - ./infra/controller:/home/auser/infra/controller
       - ./infra/monitoring:/home/auser/infra/monitoring
