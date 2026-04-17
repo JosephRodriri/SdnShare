@@ -13,11 +13,11 @@ services:
       # ── DDoS thresholds (packets per second) ──────────────────────────
       # Lower values = more sensitive detection (good for lab demos)
       # Raise them in production to reduce false positives
-      - DDOS_THRESH_SYN=100      # SYN packets/s from single IP
-      - DDOS_THRESH_UDP=200      # UDP packets/s from single IP
-      - DDOS_THRESH_ICMP=50      # ICMP packets/s from single IP
-      - DDOS_INTERVAL=2          # Detection window in seconds
-      - DDOS_BLOCK_TIMEOUT=120   # Seconds before block rule expires (0=permanent)
+      - DDOS_THRESH_SYN=100        # SYN pkts/s   → detecta SYN flood
+      - DDOS_THRESH_UDP=200       # UDP pkts/s   → detecta UDP flood
+      - DDOS_THRESH_ICMP=50       # ICMP pkts/s  → detecta ICMP flood / ping flood
+      - DDOS_INTERVAL=2          # Ventana de medición en segundos
+      - DDOS_BLOCK_TIMEOUT=120   # Segundos antes de expirar el bloqueo
     command: "infra/controller/dc_switch.py infra/controller/ddos_mitigator.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
     volumes:
       - ./infra/controller:/home/auser/infra/controller

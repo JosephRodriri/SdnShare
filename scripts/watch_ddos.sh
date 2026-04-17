@@ -1,34 +1,36 @@
 #!/usr/bin/env bash
 # scripts/watch_ddos.sh
 # ─────────────────────
-# Tail controller logs and highlight DDoS detection events.
-# Run from the host VM (not inside any container).
+# Tail de logs del controller con eventos DDoS coloreados.
+# Ejecutar desde la VM host.
 #
-# Usage:
+# Uso:
 #   chmod +x scripts/watch_ddos.sh
 #   ./scripts/watch_ddos.sh
 
-set -euo pipefail
+RED='\033[1;31m'; YELLOW='\033[1;33m'; GREEN='\033[1;32m'
+CYAN='\033[1;36m'; BLUE='\033[1;34m'; NC='\033[0m'
 
+echo ""
 echo "════════════════════════════════════════════════════════"
-echo "  DDoS Event Monitor — watching controller logs"
-echo "  Press Ctrl-C to stop"
+echo -e "  ${CYAN}Monitor DDoS — controller logs en tiempo real${NC}"
+echo "  Ctrl-C para detener"
 echo "════════════════════════════════════════════════════════"
 echo ""
 
 docker compose logs -f controller 2>&1 | while IFS= read -r line; do
-    # Highlight ATTACK DETECTED lines in red
-    if echo "$line" | grep -q "ATTACK DETECTED"; then
-        printf "\033[1;31m%s\033[0m\n" "$line"
-    # Highlight BLOCKED lines in yellow
-    elif echo "$line" | grep -q "BLOCKED"; then
-        printf "\033[1;33m%s\033[0m\n" "$line"
-    # Highlight DDOS_EVENT structured lines in cyan
+    if echo "$line" | grep -qE "ATAQUE DETECTADO|ATTACK DETECTED"; then
+        printf "${RED}%s${NC}\n" "$line"
+    elif echo "$line" | grep -qE "BLOQUEADO|BLOCKED"; then
+        printf "${YELLOW}%s${NC}\n" "$line"
     elif echo "$line" | grep -q "DDOS_EVENT"; then
-        printf "\033[1;36m%s\033[0m\n" "$line"
-    # Highlight block expiry in green
-    elif echo "$line" | grep -q "Block expired"; then
-        printf "\033[1;32m%s\033[0m\n" "$line"
+        printf "${CYAN}%s${NC}\n" "$line"
+    elif echo "$line" | grep -qE "expirado|expired"; then
+        printf "${GREEN}%s${NC}\n" "$line"
+    elif echo "$line" | grep -q "registrado\|Registered datapath"; then
+        printf "${BLUE}%s${NC}\n" "$line"
+    elif echo "$line" | grep -q "Mitigator"; then
+        printf "${CYAN}%s${NC}\n" "$line"
     else
         echo "$line"
     fi
