@@ -10,7 +10,25 @@ services:
       - INFLUXDB_HOST=influxdb
       - INFLUXDB_POLLTIME=${INFLUXDB_POLLTIME:-30}
       - PROMETHEUS_POLLTIME=${PROMETHEUS_POLLTIME:-30}
-    command: "infra/controller/dc_switch.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
+      # ── DDoS v4 (FlowStats) ──────────────────────────────────────────────
+      # DDOS_THRESH_PPS: paquetes/segundo por IP para disparar bloqueo.
+      # FlowStats ve el dataplane real. hping3 --flood genera 10k-100k pps.
+      # Tráfico legítimo (ping, iperf): < 500 pps.
+      # Empieza con 1000 y ajusta según los logs de debug.
+      - DDOS_THRESH_PPS=50
+ 
+      # Intervalo de poll FlowStats en segundos (recomendado: 2)
+      - DDOS_INTERVAL=2
+ 
+      # Segundos hasta que expira el bloqueo automáticamente (0=permanente)
+      - DDOS_BLOCK_TIMEOUT=120
+ 
+      # IPs que NUNCA bloquear (gateway, controller, servicios críticos)
+      # Separadas por coma. Dejar vacío si no aplica.
+      # - DDOS_IP_WHITELIST=10.1.1.100,10.1.1.101
+ 
+    command: "infra/controller/dc_switch.py  infra/controller/ddos_mitigator.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
+    
     volumes:
       - ./infra/controller:/home/auser/infra/controller
       - ./infra/monitoring:/home/auser/infra/monitoring
