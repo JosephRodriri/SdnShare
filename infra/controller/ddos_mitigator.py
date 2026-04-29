@@ -122,8 +122,7 @@ class DDoSMitigator(app_manager.RyuApp):
             IP_WHITELIST or "ninguna",
         )
 
-    # ── Registro de datapaths ─────────────────────────────────────────────────
-
+    # ── Registro de datapaths 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def _features_handler(self, ev):
         dp = ev.msg.datapath
@@ -131,7 +130,7 @@ class DDoSMitigator(app_manager.RyuApp):
         log.info("[DDoS] Switch registrado dpid=%d (total=%d)",
                  dp.id, len(self._datapaths))
 
-    # ── Aprendizaje pasivo MAC→IP ─────────────────────────────────────────────
+    # ── Aprendizaje pasivo MAC -> IP 
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -156,7 +155,7 @@ class DDoSMitigator(app_manager.RyuApp):
             self._mac_to_ip[src_mac] = src_ip
             log.debug("[DDoS] Aprendido MAC=%s → IP=%s", src_mac, src_ip)
 
-    # ── FlowStats polling ─────────────────────────────────────────────────────
+    # ── FlowStats polling 
 
     def _poll_loop(self):
         """Solicita FlowStats a todos los switches cada POLL_INTERVAL segundos."""
