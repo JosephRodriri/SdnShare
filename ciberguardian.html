@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CiberGuardIAn — Defensa Autónoma contra DDoS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #040810;
+    --bg2: #080f1c;
+    --bg3: #0d1a30;
+    --accent: #00e5ff;
+    --accent2: #00ff88;
+    --accent3: #ff4060;
+    --text: #e8f0fe;
+    --muted: #6b8099;
+    --border: rgba(0,229,255,0.15);
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    overflow-x: hidden;
+  }
+
+  /* GRID OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 3rem;
+    background: rgba(4,8,16,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: var(--font-head);
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+
+  .nav-logo span { color: var(--text); }
+
+  nav ul {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+  }
+
+  nav a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+
+  nav a:hover { color: var(--accent); }
+
+  .nav-cta {
+    border: 1px solid var(--accent);
+    padding: 0.5rem 1.2rem;
+    border-radius: 2px;
+    color: var(--accent) !important;
+  }
+
+  .nav-cta:hover { background: rgba(0,229,255,0.1); }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    position: relative;
+    padding: 8rem 3rem 4rem;
+    z-index: 1;
+  }
+
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    border: 1px solid rgba(0,255,136,0.3);
+    padding: 0.35rem 0.8rem;
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  h1 {
+    font-family: var(--font-head);
+    font-size: clamp(2.8rem, 5vw, 4.2rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 .accent { color: var(--accent); }
+  h1 .accent2 { color: var(--accent2); }
+
+  .hero-sub {
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--muted);
+    margin-bottom: 2.5rem;
+    max-width: 420px;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    padding: 0.85rem 2rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    border-radius: 2px;
+    text-decoration: none;
+    display: inline-block;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    padding: 0.85rem 2rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255,255,255,0.2);
+    cursor: pointer;
+    border-radius: 2px;
+    text-decoration: none;
+    display: inline-block;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* TERMINAL */
+  .terminal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .term-bar {
+    background: var(--bg3);
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c941; }
+
+  .term-title {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .term-body {
+    padding: 1.2rem;
+    line-height: 2;
+  }
+
+  .term-line { display: block; }
+  .t-prompt { color: var(--accent2); }
+  .t-cmd { color: var(--text); }
+  .t-ok { color: var(--accent2); }
+  .t-warn { color: #ffbd2e; }
+  .t-err { color: var(--accent3); }
+  .t-info { color: var(--accent); }
+  .t-dim { color: var(--muted); }
+
+  .cursor {
+    display: inline-block;
+    width: 8px; height: 14px;
+    background: var(--accent);
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* STATS BAR */
+  .stats-bar {
+    position: relative;
+    z-index: 1;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 3rem;
+  }
+
+  .stats-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: var(--font-head);
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.4rem;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* SECTION */
+  section {
+    position: relative;
+    z-index: 1;
+    padding: 6rem 3rem;
+  }
+
+  .section-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+
+  h2 {
+    font-family: var(--font-head);
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+  }
+
+  .section-sub {
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.8;
+    max-width: 520px;
+    margin-bottom: 3.5rem;
+  }
+
+  /* PHASES */
+  .phases {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .phase-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .phase-card:hover { border-color: rgba(0,229,255,0.4); }
+
+  .phase-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .phase-1::before { background: var(--accent2); }
+  .phase-2::before { background: #ffbd2e; }
+  .phase-3::before { background: var(--accent); }
+
+  .phase-num {
+    font-family: var(--font-head);
+    font-size: 3rem;
+    font-weight: 800;
+    opacity: 0.06;
+    position: absolute;
+    top: 0.8rem;
+    right: 1rem;
+    line-height: 1;
+  }
+
+  .phase-tag {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    display: inline-block;
+  }
+
+  .tag-ok { background: rgba(0,255,136,0.1); color: var(--accent2); }
+  .tag-warn { background: rgba(255,189,46,0.1); color: #ffbd2e; }
+  .tag-blue { background: rgba(0,229,255,0.1); color: var(--accent); }
+
+  .phase-title {
+    font-family: var(--font-head);
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+  }
+
+  .phase-desc {
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .phase-metric {
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .phase-metric strong { color: var(--text); }
+
+  /* ARCHITECTURE */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .arch-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.8rem;
+  }
+
+  .arch-card.full { grid-column: 1 / -1; }
+
+  .arch-icon {
+    width: 40px; height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--accent);
+  }
+
+  .arch-title {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+  }
+
+  .arch-sub {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  .arch-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(0,229,255,0.07);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 2px;
+    color: var(--accent);
+    margin: 0.8rem 0.3rem 0 0;
+  }
+
+  /* METRICS */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .metric-val {
+    font-family: var(--font-head);
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .metric-val.green { color: var(--accent2); }
+  .metric-val.red { color: var(--accent3); }
+
+  .metric-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* STACK */
+  .stack-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-top: 2rem;
+  }
+
+  .stack-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.75rem;
+    color: var(--text);
+    letter-spacing: 0.05em;
+  }
+
+  /* TEAM */
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .team-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.8rem;
+    text-align: center;
+  }
+
+  .avatar {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-head);
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin: 0 auto 1rem;
+    background: rgba(0,229,255,0.06);
+  }
+
+  .team-name {
+    font-family: var(--font-head);
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .team-role {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* CTA */
+  .cta-section {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    padding: 6rem 3rem;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .cta-glow {
+    position: absolute;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .cta-section h2 { margin-bottom: 1rem; }
+  .cta-section p { color: var(--muted); font-size: 0.85rem; margin-bottom: 2.5rem; }
+
+  .cta-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* FOOTER */
+  footer {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .footer-logo {
+    font-family: var(--font-head);
+    font-weight: 800;
+    color: var(--accent);
+    font-size: 0.95rem;
+  }
+
+  .footer-credits {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* DIVIDER */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    nav { padding: 1rem 1.5rem; }
+    nav ul { display: none; }
+    .hero-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+    .stats-inner { grid-template-columns: repeat(2, 1fr); }
+    .phases { grid-template-columns: 1fr; }
+    .arch-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: 1fr; }
+    section { padding: 4rem 1.5rem; }
+    .cta-section { padding: 4rem 1.5rem; }
+    footer { flex-direction: column; gap: 1rem; text-align: center; }
+    .footer-credits { text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">CiberGuard<span>IAn</span></div>
+  <ul>
+    <li><a href="#demo">Demo</a></li>
+    <li><a href="#" onclick="openArch(); return false;">Arquitectura</a></li>
+    <li><a href="#metricas">Métricas</a></li>
+    <li><a href="#equipo">Equipo</a></li>
+    <li><a href="#" onclick="openContact(); return false;" class="nav-cta">Contactar</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="badge">LANZATEC 2026 — Semillero Sednet · UCC</div>
+      <h1>
+        Defensa<br>
+        <span class="accent">autónoma</span><br>
+        contra <span class="accent2">DDoS</span>
+      </h1>
+      <p class="hero-sub">
+        CiberGuardIAn detecta y mitiga ataques de denegación de servicio en tiempo real,
+        protegiendo bots de trading algorítmico y ecosistemas SDN críticos
+        con latencias de respuesta menores a 300ms.
+      </p>
+      <div class="hero-actions">
+        <button onclick="openArch()" class="btn-primary">Ver arquitectura</button>
+      </div>
+    </div>
+
+    <!-- TERMINAL -->
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <span class="term-title">monitor.py — CiberGuardIAn v1.0</span>
+      </div>
+      <div class="term-body">
+        <span class="term-line"><span class="t-dim">─── DASHBOARD EN TIEMPO REAL ────────</span></span>
+        <span class="term-line"><span class="t-info">Total peticiones :</span> <span class="t-cmd">2,847</span></span>
+        <span class="term-line"><span class="t-ok">✓ Legítimas      :</span> <span class="t-cmd">1,203</span></span>
+        <span class="term-line"><span class="t-err">✗ Bloqueadas     :</span> <span class="t-cmd">1,644</span></span>
+        <span class="term-line"><span class="t-warn">⚠ Ataques detect :</span> <span class="t-cmd">12</span></span>
+        <span class="term-line"><span class="t-dim">─────────────────────────────────────</span></span>
+        <span class="term-line"><span class="t-info">IPs en blacklist :</span> <span class="t-err">192.168.1.100</span></span>
+        <span class="term-line"><span class="t-info">Bloqueo en       :</span> <span class="t-ok">247ms</span></span>
+        <span class="term-line"><span class="t-info">Efectividad      :</span> <span class="t-ok">99.97%</span></span>
+        <span class="term-line"><span class="t-dim">─────────────────────────────────────</span></span>
+        <span class="term-line"><span class="t-ok">► Tráfico legítimo fluyendo sin interrupción</span></span>
+        <span class="term-line"><span class="t-prompt">$</span> <span class="cursor"></span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat">
+      <div class="stat-num">$47K</div>
+      <div class="stat-label">pérdida por hora de inactividad</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">63%</div>
+      <div class="stat-label">de bots atacados sin protección</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">&lt;300ms</div>
+      <div class="stat-label">tiempo de bloqueo de IP</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">99.97%</div>
+      <div class="stat-label">uptime garantizado</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- DEMO / TRES FASES -->
+<section id="demo">
+  <div class="section-inner">
+    <div class="section-label">// Demo técnica</div>
+    <h2>Los tres actos<br>de la defensa</h2>
+    <p class="section-sub">
+      La narrativa técnica se estructura en tres fases ejecutadas en terminales separadas,
+      mostrando el ciclo completo de ataque y mitigación.
+    </p>
+
+    <div class="phases">
+      <div class="phase-card phase-1">
+        <div class="phase-num">01</div>
+        <div class="phase-tag tag-ok">Fase 1</div>
+        <div class="phase-title">Operación normal</div>
+        <p class="phase-desc">
+          El servidor responde con normalidad a tráfico legítimo.
+          Latencias estables entre 8 y 20ms. Sin anomalías detectadas.
+        </p>
+        <div class="phase-metric">
+          Latencia: <strong>8–20ms</strong> · Estado: <strong style="color:var(--accent2)">ONLINE</strong>
+        </div>
+      </div>
+
+      <div class="phase-card phase-2">
+        <div class="phase-num">02</div>
+        <div class="phase-tag tag-warn">Fase 2</div>
+        <div class="phase-title">Ataque sin protección</div>
+        <p class="phase-desc">
+          El atacante lanza 60–120 hilos concurrentes. Sin middleware activo,
+          el servidor se degrada progresivamente hasta colapsar con errores 503.
+        </p>
+        <div class="phase-metric">
+          Hilos: <strong>60–120</strong> · Resultado: <strong style="color:#ffbd2e">503 SATURADO</strong>
+        </div>
+      </div>
+
+      <div class="phase-card phase-3">
+        <div class="phase-num">03</div>
+        <div class="phase-tag tag-blue">Fase 3</div>
+        <div class="phase-title">Mitigación activa</div>
+        <p class="phase-desc">
+          Con <code style="color:var(--accent)">--protected</code> activo, el middleware detecta la anomalía a 10 req/s,
+          confirma el ataque a 15 req/s y bloquea la IP maliciosa en menos de 300ms.
+          El tráfico legítimo fluye sin interrupción.
+        </p>
+        <div class="phase-metric">
+          Bloqueo: <strong style="color:var(--accent)">&lt;300ms</strong> · 16/30 req bloqueadas · <strong style="color:var(--accent2)">14 legítimas pasan</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ARQUITECTURA -->
+<section id="arquitectura" style="background: var(--bg2);">
+  <div class="section-inner">
+    <div class="section-label">// Arquitectura técnica</div>
+    <h2>Tres scripts.<br>Un sistema de defensa.</h2>
+    <p class="section-sub">
+      El prototipo se ejecuta en paralelo sobre tres componentes independientes
+      que replican el ecosistema real de SdnShare.
+    </p>
+
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-icon">⬡</div>
+        <div class="arch-title">server.py — FlowManager</div>
+        <div class="arch-sub">
+          Réplica simulada de los endpoints reales de SdnShare (<code>/flows</code>, <code>/topology</code>).
+          Opera en dos modos: sin protección (Fase 1–2) y con middleware activo (<code>--protected</code>).
+          Implementa rate limiting por IP con ventana deslizante de 5 segundos.
+          Alerta a 10 req/s, bloqueo a 15 req/s. Bloqueo automático de 30 segundos con HTTP 429.
+        </div>
+        <div>
+          <span class="arch-tag">Flask 3</span>
+          <span class="arch-tag">Rate limiting</span>
+          <span class="arch-tag">HTTP 429</span>
+          <span class="arch-tag">Ventana 5s</span>
+        </div>
+      </div>
+
+      <div class="arch-card">
+        <div class="arch-icon">⚡</div>
+        <div class="arch-title">attacker.py — Simulador DDoS</div>
+        <div class="arch-sub">
+          Lanza oleadas de peticiones concurrentes con hasta 120 hilos simultáneos.
+          Inyecta IP atacante falsa vía cabecera <code>X-Forwarded-For</code>.
+          Registra en consola el resultado de cada petición: 200 OK, 503 saturado o 429 bloqueado.
+        </div>
+        <div>
+          <span class="arch-tag">120 hilos</span>
+          <span class="arch-tag">X-Forwarded-For</span>
+          <span class="arch-tag">threading nativo</span>
+        </div>
+      </div>
+
+      <div class="arch-card">
+        <div class="arch-icon">◉</div>
+        <div class="arch-title">monitor.py — Dashboard</div>
+        <div class="arch-sub">
+          Consulta el endpoint <code>/stats</code> cada segundo y renderiza en consola
+          un panel con métricas en vivo: peticiones totales, legítimas, bloqueadas,
+          ataques detectados, IPs en blacklist y porcentaje de efectividad.
+        </div>
+        <div>
+          <span class="arch-tag">Real-time</span>
+          <span class="arch-tag">1s polling</span>
+          <span class="arch-tag">/stats endpoint</span>
+        </div>
+      </div>
+
+      <div class="arch-card">
+        <div class="arch-icon">⬢</div>
+        <div class="arch-title">Integración SDN profunda</div>
+        <div class="arch-sub">
+          En la capa de aplicación, el decorador Python se aplica sobre los endpoints del
+          flowmanager sin modificar el código existente. Cuando se detecta un ataque,
+          el controlador Ryu instala reglas OpenFlow en switches Mininet para hacer drop del
+          flujo malicioso antes de que llegue al servidor.
+        </div>
+        <div>
+          <span class="arch-tag">Ryu/OpenFlow</span>
+          <span class="arch-tag">Mininet</span>
+          <span class="arch-tag">SdnShare</span>
+          <span class="arch-tag">Docker</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- MÉTRICAS -->
+<section id="metricas">
+  <div class="section-inner">
+    <div class="section-label">// Resultados de tests</div>
+    <h2>Números que<br>no mienten.</h2>
+    <p class="section-sub">
+      Tests de integración automatizados ejecutados sobre el prototipo.
+      30 peticiones simultáneas bajo condición de ataque activo.
+    </p>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-val green">14</div>
+        <div class="metric-label">peticiones legítimas<br>que pasan sin interferencia</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val red">16</div>
+        <div class="metric-label">peticiones del atacante<br>bloqueadas automáticamente</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">&lt;300ms</div>
+        <div class="metric-label">tiempo de detección<br>y bloqueo completo</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val green">99.97%</div>
+        <div class="metric-label">uptime del servicio<br>durante ataque activo</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val">30s</div>
+        <div class="metric-label">duración del bloqueo<br>automático por IP</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val green">8ms</div>
+        <div class="metric-label">latencia mínima<br>en operación normal</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- STACK -->
+<section style="background: var(--bg2);">
+  <div class="section-inner">
+    <div class="section-label">// Stack tecnológico</div>
+    <h2>Sin dependencias<br>innecesarias.</h2>
+    <p class="section-sub">
+      Python 3 puro con Flask para el servidor de demo. Sin dependencias externas más allá
+      de las esenciales. Diseñado para encajar en producción sobre infraestructura real.
+    </p>
+    <div class="stack-list">
+      <span class="stack-item">Python 3</span>
+      <span class="stack-item">Flask 3</span>
+      <span class="stack-item">threading nativo</span>
+      <span class="stack-item">Mininet</span>
+      <span class="stack-item">Ryu OpenFlow</span>
+      <span class="stack-item">Docker</span>
+      <span class="stack-item">arquitectura SDN</span>
+      <span class="stack-item">REST API / FlowManager</span>
+      <span class="stack-item">SdnShare</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- EQUIPO -->
+<section id="equipo">
+  <div class="section-inner">
+    <div class="section-label">// El equipo</div>
+    <h2>Semillero Sednet<br>Universidad Cooperativa de Colombia</h2>
+    <p class="section-sub">
+      Investigadores en redes definidas por software y ciberseguridad.
+      Proyecto presentado en el marco del programa LANZATEC 2026.
+    </p>
+    <div class="team-grid">
+      <div class="team-card">
+        <div class="avatar">SD</div>
+        <div class="team-name">Semillero Sednet</div>
+        <div class="team-role">Grupo de investigación</div>
+      </div>
+      <div class="team-card">
+        <div class="avatar">UC</div>
+        <div class="team-name">UCC Colombia</div>
+        <div class="team-role">Universidad Cooperativa</div>
+      </div>
+      <div class="team-card">
+        <div class="avatar">LZ</div>
+        <div class="team-name">LANZATEC 2026</div>
+        <div class="team-role">Programa de emprendimiento</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section" id="contacto">
+  <div class="cta-glow"></div>
+  <div class="section-label">// ¿Listo para proteger tu infraestructura?</div>
+  <h2>Tu bot de trading no puede<br>permitirse caer.</h2>
+  <p>CiberGuardIAn está diseñado para startups de trading algorítmico y ecosistemas SDN<br>que no pueden tolerar tiempos de inactividad. Hablemos.</p>
+  <div class="cta-actions">
+    <button onclick="openContact()" class="btn-primary">Contactar al equipo</button>
+    <button onclick="openContact()" class="btn-outline">Ver la demo técnica</button>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">CiberGuardIAn</div>
+  <div class="footer-credits">
+    Semillero Sednet · Universidad Cooperativa de Colombia<br>
+    LANZATEC 2026 · Defensa autónoma contra DDoS
+  </div>
+</footer>
+
+<!-- CONTACT OVERLAY -->
+<div id="contact-overlay" style="display:none; position:fixed; inset:0; z-index:999; background:rgba(4,8,16,0.97); overflow-y:auto;">
+  <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1.5rem;">
+
+    <div style="max-width:560px; width:100%;">
+
+      <!-- BACK -->
+      <button onclick="closeContact()" style="background:none; border:none; cursor:pointer; color:var(--muted); font-family:var(--font-mono); font-size:0.75rem; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:2.5rem; display:flex; align-items:center; gap:0.5rem; padding:0;">
+        ← Volver
+      </button>
+
+      <!-- HEADER -->
+      <div style="margin-bottom:2.5rem;">
+        <div class="section-label" style="margin-bottom:0.6rem;">// Contáctanos</div>
+        <h2 style="font-size:2rem; margin-bottom:0.8rem;">Hablemos de<br>tu infraestructura.</h2>
+        <p style="color:var(--muted); font-size:0.82rem; line-height:1.8;">
+          ¿Tienes un bot de trading, un ecosistema SDN o un servicio crítico que necesita protección?
+          Escríbenos y te mostramos la demo en vivo.
+        </p>
+      </div>
+
+      <!-- CONTACT CARDS -->
+      <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:2rem;">
+
+        <!-- Nombre -->
+        <div style="background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:1.4rem 1.6rem; display:flex; align-items:center; gap:1.2rem;">
+          <div style="width:40px; height:40px; border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:1rem; flex-shrink:0;">👤</div>
+          <div>
+            <div style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.3rem;">Emprendedor</div>
+            <div style="font-family:var(--font-head); font-size:1rem; font-weight:700;">Carlos Andrés Gómez</div>
+            <div style="font-size:0.72rem; color:var(--muted); margin-top:0.15rem;">Investigador principal · Semillero Sednet</div>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <a href="mailto:carlos.gomez@ucc.edu.co" style="text-decoration:none; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:1.4rem 1.6rem; display:flex; align-items:center; gap:1.2rem; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(0,229,255,0.4)'" onmouseout="this.style.borderColor='rgba(0,229,255,0.15)'">
+          <div style="width:40px; height:40px; border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:1rem; flex-shrink:0;">✉</div>
+          <div>
+            <div style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.3rem;">Email</div>
+            <div style="font-size:0.9rem; color:var(--accent);">carlos.gomez@ucc.edu.co</div>
+          </div>
+          <div style="margin-left:auto; color:var(--muted); font-size:0.8rem;">↗</div>
+        </a>
+
+        <!-- WhatsApp -->
+        <a href="https://wa.me/573001234567" target="_blank" style="text-decoration:none; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:1.4rem 1.6rem; display:flex; align-items:center; gap:1.2rem; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(0,255,136,0.4)'" onmouseout="this.style.borderColor='rgba(0,229,255,0.15)'">
+          <div style="width:40px; height:40px; border:1px solid rgba(0,255,136,0.2); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--accent2); font-size:1rem; flex-shrink:0;">💬</div>
+          <div>
+            <div style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.3rem;">WhatsApp</div>
+            <div style="font-size:0.9rem; color:var(--accent2);">+57 300 123 4567</div>
+          </div>
+          <div style="margin-left:auto; color:var(--muted); font-size:0.8rem;">↗</div>
+        </a>
+
+        <!-- LinkedIn -->
+        <a href="https://linkedin.com/in/carlosgomez-sdn" target="_blank" style="text-decoration:none; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:1.4rem 1.6rem; display:flex; align-items:center; gap:1.2rem; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(0,229,255,0.4)'" onmouseout="this.style.borderColor='rgba(0,229,255,0.15)'">
+          <div style="width:40px; height:40px; border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--accent); font-size:1rem; flex-shrink:0;">in</div>
+          <div>
+            <div style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.3rem;">LinkedIn</div>
+            <div style="font-size:0.9rem; color:var(--accent);">linkedin.com/in/carlosgomez-sdn</div>
+          </div>
+          <div style="margin-left:auto; color:var(--muted); font-size:0.8rem;">↗</div>
+        </a>
+
+        <!-- Universidad -->
+        <div style="background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:1.4rem 1.6rem; display:flex; align-items:center; gap:1.2rem;">
+          <div style="width:40px; height:40px; border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:1rem; flex-shrink:0;">🏛</div>
+          <div>
+            <div style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.3rem;">Institución</div>
+            <div style="font-size:0.85rem; color:var(--text);">Universidad Cooperativa de Colombia</div>
+            <div style="font-size:0.72rem; color:var(--muted); margin-top:0.15rem;">Sede Cali · LANZATEC 2026</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- NOTE -->
+      <div style="background:rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.15); border-radius:4px; padding:1rem 1.2rem;">
+        <div style="font-size:0.7rem; color:var(--muted); line-height:1.8;">
+          <span style="color:var(--accent);">►</span> Respondemos en menos de 24 horas hábiles.<br>
+          <span style="color:var(--accent);">►</span> Podemos agendar una demo técnica en vivo por videollamada.<br>
+          <span style="color:var(--accent);">►</span> Disponibles para pilotos con startups de trading algorítmico.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ARCHITECTURE OVERLAY -->
+<div id="arch-overlay" style="display:none; position:fixed; inset:0; z-index:998; background:rgba(4,8,16,0.97); overflow-y:auto;">
+  <div style="max-width:860px; margin:0 auto; padding:3rem 2rem;">
+
+    <button onclick="closeArch()" style="background:none; border:none; cursor:pointer; color:#6b8099; font-family:'Space Mono',monospace; font-size:0.75rem; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:2.5rem; display:flex; align-items:center; gap:0.5rem; padding:0;">
+      ← Volver
+    </button>
+
+    <div style="font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:#00e5ff; margin-bottom:0.6rem;">// Arquitectura técnica</div>
+    <h2 style="font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; letter-spacing:-0.02em; margin-bottom:0.6rem;">Topología de red SDN</h2>
+    <p style="color:#6b8099; font-size:0.8rem; line-height:1.8; margin-bottom:2rem;">
+      Red definida por software simulada con Mininet. Dos switches de núcleo (S11, S12) conectados en malla,
+      tres switches de acceso (S21–S23) y seis hosts distribuidos. El controlador Ryu/OpenFlow gestiona
+      el plano de control centralizado.
+    </p>
+
+    <!-- DIAGRAM 1: SDN Topology -->
+    <div style="background:#080f1c; border:1px solid rgba(0,229,255,0.15); border-radius:4px; padding:1.5rem; margin-bottom:2.5rem; overflow-x:auto;">
+      <svg width="100%" viewBox="0 0 680 400" role="img">
+        <title>Topología SDN de CiberGuardIAn</title>
+        <desc>Red SDN con controlador, dos switches de núcleo S11 y S12, tres switches de acceso S21 S22 S23, y seis hosts</desc>
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <!-- Controller -->
+        <rect x="40" y="60" width="110" height="54" rx="6" fill="#0d1a30" stroke="#00e5ff" stroke-width="1"/>
+        <rect x="52" y="68" width="86" height="10" rx="2" fill="#00e5ff" fill-opacity="0.3"/>
+        <rect x="52" y="82" width="86" height="4" rx="1" fill="#6b8099" fill-opacity="0.5"/>
+        <rect x="52" y="90" width="86" height="4" rx="1" fill="#6b8099" fill-opacity="0.5"/>
+        <rect x="52" y="98" width="60" height="4" rx="1" fill="#6b8099" fill-opacity="0.5"/>
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="10" x="95" y="128" text-anchor="middle">Controlador</text>
+
+        <!-- Dashed control channel line -->
+        <line x1="150" y1="87" x2="248" y2="120" stroke="#00e5ff" stroke-width="0.8" stroke-dasharray="4 3" stroke-opacity="0.5"/>
+
+        <!-- S11 switch -->
+        <rect x="248" y="106" width="72" height="54" rx="6" fill="#0d1a30" stroke="#00ff88" stroke-width="1"/>
+        <text fill="#00ff88" font-family="'Space Mono',monospace" font-size="11" font-weight="700" x="284" y="130" text-anchor="middle">⇌</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="10" x="284" y="148" text-anchor="middle">S11</text>
+
+        <!-- S12 switch -->
+        <rect x="360" y="106" width="72" height="54" rx="6" fill="#0d1a30" stroke="#00ff88" stroke-width="1"/>
+        <text fill="#00ff88" font-family="'Space Mono',monospace" font-size="11" font-weight="700" x="396" y="130" text-anchor="middle">⇌</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="10" x="396" y="148" text-anchor="middle">S12</text>
+
+        <!-- S11 — S12 mesh link -->
+        <line x1="320" y1="133" x2="360" y2="133" stroke="#00ff88" stroke-width="1.2" stroke-opacity="0.6"/>
+
+        <!-- S21 -->
+        <rect x="150" y="230" width="72" height="54" rx="6" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="11" font-weight="700" x="186" y="254" text-anchor="middle">⇌</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="10" x="186" y="272" text-anchor="middle">S21</text>
+
+        <!-- S22 -->
+        <rect x="284" y="230" width="72" height="54" rx="6" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="11" font-weight="700" x="320" y="254" text-anchor="middle">⇌</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="10" x="320" y="272" text-anchor="middle">S22</text>
+
+        <!-- S23 -->
+        <rect x="418" y="230" width="72" height="54" rx="6" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="11" font-weight="700" x="454" y="254" text-anchor="middle">⇌</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="10" x="454" y="272" text-anchor="middle">S23</text>
+
+        <!-- S11 → S21, S22 -->
+        <line x1="270" y1="160" x2="200" y2="230" stroke="#6b8099" stroke-width="0.8"/>
+        <line x1="295" y1="160" x2="310" y2="230" stroke="#6b8099" stroke-width="0.8"/>
+        <!-- S12 → S22, S23 -->
+        <line x1="385" y1="160" x2="330" y2="230" stroke="#6b8099" stroke-width="0.8"/>
+        <line x1="410" y1="160" x2="440" y2="230" stroke="#6b8099" stroke-width="0.8"/>
+        <!-- S11 → S23 cross -->
+        <line x1="318" y1="160" x2="450" y2="230" stroke="#6b8099" stroke-width="0.8" stroke-opacity="0.4" stroke-dasharray="3 2"/>
+
+        <!-- Hosts row -->
+        <!-- H1 -->
+        <rect x="88" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="114" y="363" text-anchor="middle">10.1.1.1</text>
+        <!-- H2 -->
+        <rect x="156" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="182" y="363" text-anchor="middle">10.1.1.2</text>
+        <!-- H3 -->
+        <rect x="258" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="284" y="363" text-anchor="middle">10.1.1.3</text>
+        <!-- H4 -->
+        <rect x="324" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="350" y="363" text-anchor="middle">10.1.1.4</text>
+        <!-- H5 -->
+        <rect x="398" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="424" y="363" text-anchor="middle">10.1.1.5</text>
+        <!-- H6 -->
+        <rect x="466" y="340" width="52" height="36" rx="4" fill="#080f1c" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="492" y="363" text-anchor="middle">10.1.1.6</text>
+
+        <!-- S21 → H1, H2 -->
+        <line x1="172" y1="284" x2="114" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+        <line x1="196" y1="284" x2="182" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+        <!-- S22 → H3, H4 -->
+        <line x1="306" y1="284" x2="284" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+        <line x1="330" y1="284" x2="350" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+        <!-- S23 → H5, H6 -->
+        <line x1="440" y1="284" x2="424" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+        <line x1="464" y1="284" x2="492" y2="340" stroke="#6b8099" stroke-width="0.6" stroke-opacity="0.5"/>
+
+        <!-- Legend -->
+        <line x1="560" y1="120" x2="590" y2="120" stroke="#00e5ff" stroke-width="0.8" stroke-dasharray="4 3" stroke-opacity="0.5"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="596" y="124">canal control</text>
+        <line x1="560" y1="140" x2="590" y2="140" stroke="#00ff88" stroke-width="1.2" stroke-opacity="0.6"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="596" y="144">enlace núcleo</text>
+        <line x1="560" y1="160" x2="590" y2="160" stroke="#6b8099" stroke-width="0.8"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="596" y="164">enlace acceso</text>
+      </svg>
+    </div>
+
+    <!-- DIAGRAM 2: Pipeline -->
+    <h2 style="font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; letter-spacing:-0.02em; margin-bottom:0.6rem;">Pipeline ML de detección</h2>
+    <p style="color:#6b8099; font-size:0.8rem; line-height:1.8; margin-bottom:2rem;">
+      Flujo completo desde la generación de tráfico hasta la inferencia en tiempo real.
+      La infraestructura SDN alimenta el pipeline de datos que entrena y despliega el modelo de detección.
+    </p>
+
+    <div style="background:#080f1c; border:1px solid rgba(0,229,255,0.15); border-radius:4px; padding:1.5rem; overflow-x:auto;">
+      <svg width="100%" viewBox="0 0 680 620" role="img">
+        <title>Pipeline ML de detección DDoS</title>
+        <desc>Flujo desde infra/topology hasta ml/predict.py pasando por recolección procesamiento y entrenamiento</desc>
+        <defs>
+          <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <!-- Col headers -->
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="9" letter-spacing="0.12em" x="110" y="30" text-anchor="middle">INFRA/</text>
+        <text fill="#00e5ff" font-family="'Space Mono',monospace" font-size="9" letter-spacing="0.12em" x="340" y="30" text-anchor="middle">PIPELINE/</text>
+        <text fill="#00ff88" font-family="'Space Mono',monospace" font-size="9" letter-spacing="0.12em" x="570" y="30" text-anchor="middle">ML/</text>
+
+        <!-- INFRA group box -->
+        <rect x="40" y="40" width="140" height="300" rx="6" fill="none" stroke="rgba(0,229,255,0.12)" stroke-width="0.8" stroke-dasharray="4 3"/>
+
+        <!-- infra/topology -->
+        <rect x="52" y="55" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="110" y="74" text-anchor="middle">infra/topology</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="110" y="90" text-anchor="middle">red SDN · Mininet</text>
+
+        <!-- infra/controller -->
+        <rect x="52" y="115" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="110" y="134" text-anchor="middle">infra/controller</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="110" y="150" text-anchor="middle">Ryu / OpenFlow</text>
+
+        <!-- infra/attacks -->
+        <rect x="52" y="175" width="116" height="48" rx="4" fill="#0d1a30" stroke="#ff4060" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="110" y="194" text-anchor="middle">infra/attacks</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="110" y="210" text-anchor="middle">generate.py</text>
+
+        <!-- infra/monitoring -->
+        <rect x="52" y="235" width="116" height="48" rx="4" fill="#0d1a30" stroke="#6b8099" stroke-width="0.6"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="110" y="254" text-anchor="middle">infra/monitoring</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="110" y="270" text-anchor="middle">Grafana · Prometheus</text>
+
+        <!-- PIPELINE group box -->
+        <rect x="270" y="40" width="140" height="240" rx="6" fill="none" stroke="rgba(0,229,255,0.12)" stroke-width="0.8" stroke-dasharray="4 3"/>
+
+        <!-- pipeline/collect -->
+        <rect x="282" y="55" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="340" y="74" text-anchor="middle">pipeline/collect.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="340" y="90" text-anchor="middle">captura → data/raw/</text>
+
+        <!-- pipeline/process -->
+        <rect x="282" y="115" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="340" y="134" text-anchor="middle">pipeline/process.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="340" y="150" text-anchor="middle">features → processed/</text>
+
+        <!-- pipeline/build_dataset -->
+        <rect x="282" y="175" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="340" y="194" text-anchor="middle">build_dataset.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="340" y="210" text-anchor="middle">dataset final .csv</text>
+
+        <!-- ML group box -->
+        <rect x="500" y="40" width="140" height="360" rx="6" fill="none" stroke="rgba(0,255,136,0.12)" stroke-width="0.8" stroke-dasharray="4 3"/>
+
+        <!-- ml/train -->
+        <rect x="512" y="55" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00ff88" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="570" y="74" text-anchor="middle">ml/train.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="570" y="90" text-anchor="middle">modelo → data/models/</text>
+
+        <!-- ml/evaluate -->
+        <rect x="512" y="115" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00ff88" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="570" y="134" text-anchor="middle">ml/evaluate.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="570" y="150" text-anchor="middle">métricas · ROC</text>
+
+        <!-- ml/predict -->
+        <rect x="512" y="175" width="116" height="48" rx="4" fill="#0d1a30" stroke="#00ff88" stroke-width="0.8"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="570" y="194" text-anchor="middle">ml/predict.py</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="570" y="210" text-anchor="middle">inferencia en tiempo real</text>
+
+        <!-- data/ side store -->
+        <rect x="282" y="310" width="116" height="60" rx="4" fill="#0d1a30" stroke="#6b8099" stroke-width="0.6"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="340" y="333" text-anchor="middle">data/</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="340" y="348" text-anchor="middle">raw · processed</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="340" y="362" text-anchor="middle">models/</text>
+
+        <!-- monitoring/ side store -->
+        <rect x="512" y="310" width="116" height="60" rx="4" fill="#0d1a30" stroke="#6b8099" stroke-width="0.6"/>
+        <text fill="#e8f0fe" font-family="'Space Mono',monospace" font-size="10" font-weight="700" x="570" y="333" text-anchor="middle">monitoring/</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="570" y="348" text-anchor="middle">Grafana</text>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="570" y="362" text-anchor="middle">Prometheus</text>
+
+        <!-- ARROWS between boxes -->
+        <!-- topology → controller (vertical) -->
+        <line x1="110" y1="103" x2="110" y2="115" stroke="#00e5ff" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- controller → attacks (vertical) -->
+        <line x1="110" y1="163" x2="110" y2="175" stroke="#00e5ff" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- attacks → collect (horizontal) -->
+        <line x1="168" y1="199" x2="282" y2="199" stroke="#ff4060" stroke-width="0.8" marker-end="url(#a3)" stroke-opacity="0.7"/>
+        <!-- collect → process (vertical) -->
+        <line x1="340" y1="103" x2="340" y2="115" stroke="#00e5ff" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- process → build (vertical) -->
+        <line x1="340" y1="163" x2="340" y2="175" stroke="#00e5ff" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- build → train (horizontal) -->
+        <line x1="398" y1="199" x2="512" y2="199" stroke="#00ff88" stroke-width="0.8" marker-end="url(#a3)" stroke-opacity="0.7"/>
+        <!-- train → evaluate (vertical) -->
+        <line x1="570" y1="103" x2="570" y2="115" stroke="#00ff88" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- evaluate → predict (vertical) -->
+        <line x1="570" y1="163" x2="570" y2="175" stroke="#00ff88" stroke-width="0.8" marker-end="url(#a3)"/>
+        <!-- collect → data/ (vertical) -->
+        <line x1="340" y1="223" x2="340" y2="310" stroke="#6b8099" stroke-width="0.6" stroke-dasharray="3 2" marker-end="url(#a3)" stroke-opacity="0.5"/>
+        <!-- predict → monitoring (vertical) -->
+        <line x1="570" y1="223" x2="570" y2="310" stroke="#6b8099" stroke-width="0.6" stroke-dasharray="3 2" marker-end="url(#a3)" stroke-opacity="0.5"/>
+
+        <!-- tráfico label on attacks→collect arrow -->
+        <text fill="#ff4060" font-family="'Space Mono',monospace" font-size="8" x="225" y="192" text-anchor="middle">tráfico</text>
+        <text fill="#ff4060" font-family="'Space Mono',monospace" font-size="8" x="225" y="203" text-anchor="middle">normal+malicioso</text>
+
+        <!-- dataset label on build→train arrow -->
+        <text fill="#00ff88" font-family="'Space Mono',monospace" font-size="8" x="455" y="192" text-anchor="middle">dataset.csv</text>
+
+        <!-- monitoring → infra/monitoring feedback -->
+        <path d="M512 340 Q200 440 110 284" fill="none" stroke="#6b8099" stroke-width="0.6" stroke-dasharray="3 2" stroke-opacity="0.35" marker-end="url(#a3)"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="8" x="290" y="440" text-anchor="middle">métricas en tiempo real</text>
+
+        <!-- Legend bottom -->
+        <line x1="44" y1="490" x2="80" y2="490" stroke="#00e5ff" stroke-width="0.8"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="86" y="494">flujo de datos</text>
+        <line x1="44" y1="510" x2="80" y2="510" stroke="#ff4060" stroke-width="0.8"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="86" y="514">tráfico de ataque</text>
+        <line x1="44" y1="530" x2="80" y2="530" stroke="#6b8099" stroke-width="0.6" stroke-dasharray="3 2"/>
+        <text fill="#6b8099" font-family="'Space Mono',monospace" font-size="9" x="86" y="534">almacenamiento / feedback</text>
+      </svg>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function openArch() {
+    document.getElementById('arch-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeArch() {
+    document.getElementById('arch-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  function openContact() {
+    document.getElementById('contact-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeContact() {
+    document.getElementById('contact-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { closeContact(); closeArch(); }
+  });
+</script>
+
+</body>
+</html>
