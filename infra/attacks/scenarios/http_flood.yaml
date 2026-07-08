@@ -1,0 +1,74 @@
+# Escenario: HTTP Flood con Apache Benchmark
+# Objetivo: Verificar que HTTP flood se detecta sin bloquear por SYN.
+#
+# Casos de prueba:
+#   A) ab sin keep-alive: genera SYN iniciales + HTTP → HTTP_CANDIDATE → BLOCKED
+#   B) ab con keep-alive: pocos SYN, muchos HTTP → OBSERVING → BLOCKED(HTTP)
+
+
+scenario:
+  name: "HTTP Flood — Apache Benchmark"
+  id: http_flood_ab
+  version: "1.0"
+  category: http_flood
+  severity: high
+  description: |
+    HTTP flood usando Apache Benchmark (ab).
+    
+    Caso A (sin keep-alive, -c concurrencia alta):
+      ab -c 100 -n 2000 http://TARGET/
+      → ~100 SYN iniciales + HTTP GET requests
+      → SYN_CANDIDATE (si SYN > 100) → HTTP_CANDIDATE → BLOCKED(HTTP_FLOOD)
+    
+    Caso B (con keep-alive, -k):
+      ab -k -c 10 -n 500 http://TARGET/
+      → 10 SYN (1 por worker) + 500 HTTP (keep-alive)
+      → OBSERVING → HTTP count > threshold=10 → BLOCKED(HTTP_FLOOD)
+    
+    Diferencia crítica de v8: Caso A NO debe bloquearse como SYN_FLOOD.
+    El período de gracia + ratio HTTP/SYN ≥ 0.2 debe clasificarlo como HTTP.
+
+attack:
+  tool: ab
+  variants:
+    - name: "sin keep-alive (alta concurrencia)"
+      command_template: "ab -c {concurrency} -n {requests} http://{target}/"
+      parameters:
+        concurrency: 100
+        requests: 2000
+
+    - name: "con keep-alive (baja SYN)"
+      command_template: "ab -k -c {concurrency} -n {requests} http://{target}/"
+      parameters:
+        concurrency: 10
+        requests: 500
+
+topology:
+  attacker: h2
+  target: h4
+  target_port: 80
+  target_service: "python3 -m http.server 80"
+
+expected_detection:
+  attack_type: HTTP_FLOOD
+  must_not_detect_as: SYN_FLOOD   # Validación de no falso positivo
+  max_detection_time_s: 3.0
+
+validation:
+  pre_attack:
+    - action: start_http_server
+      host: h4
+      port: 80
+  post_attack:
+    - action: ping_test
+      from: h2
+      to: h4
+      expected_loss_pct: 100
+    - action: check_log
+      pattern: "HTTP_FLOOD"
+      must_not_contain: "SYN_FLOOD"
+
+evidence:
+  collect_pcap: true
+  collect_controller_log: true
+  collect_http_server_log: true

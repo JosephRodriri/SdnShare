@@ -6,6 +6,8 @@ COPY infra/docker/entrypoint-mininet.sh /ENTRYPOINT.sh
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    hping3 \
+    nmap \
     curl \
     dnsutils \
     ifupdown \
@@ -33,4 +35,3 @@ RUN pip3 install --break-system-packages mininet pyaml
 EXPOSE 6633 6653 6640
 
 ENTRYPOINT ["/ENTRYPOINT.sh"]
-

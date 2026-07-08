@@ -1,0 +1,50 @@
+# Escenario: SYN Flood con hping3
+# Objetivo: Verificar detección SYN_FLOOD y bloqueo en < 1 segundo.
+#
+# Herramienta:  hping3 -S --flood
+# Diferenciador: SYN sin completar handshake → ratio HTTP/SYN → 0.0
+
+
+scenario:
+  name: "SYN Flood — hping3 --flood"
+  id: syn_flood_hping3
+  version: "1.0"
+  category: syn_flood
+  severity: high
+  description: |
+    SYN flood de alta velocidad usando hping3 en modo flood.
+    Genera >10.000 SYN/segundo sin completar el handshake TCP.
+    El detector SYN debe:
+      1. Detectar SYN rate > threshold=100 en window=1.0s
+      2. Entrar a SYN_CANDIDATE
+      3. Esperar grace_ms=100ms → no llega HTTP
+      4. Ratio < ratio_min=0.2 → BLOCKED(SYN_FLOOD)
+
+attack:
+  tool: hping3
+  command_template: "hping3 -S --flood -p {port} {target}"
+  parameters:
+    port: 80
+    duration_s: 10
+
+topology:
+  attacker: h1
+  target: h4
+  target_port: 80
+
+expected_detection:
+  attack_type: SYN_FLOOD
+  max_detection_time_s: 2.0    # El bloqueo debe ocurrir en < 2 segundos
+  min_syn_rate: 1000            # pps mínimo esperado del generador
+
+validation:
+  method: ping_after_attack
+  ping_count: 3
+  ping_timeout_s: 1
+  expected_packet_loss_pct: 100  # 100% pérdida = bloqueado
+
+evidence:
+  collect_pcap: true
+  pcap_filter: "ip src {attacker_ip}"
+  collect_controller_log: true
+  log_pattern: "ATAQUE DETECTADO.*SYN_FLOOD"
