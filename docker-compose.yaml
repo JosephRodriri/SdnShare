@@ -10,7 +10,23 @@ services:
       - INFLUXDB_HOST=influxdb
       - INFLUXDB_POLLTIME=${INFLUXDB_POLLTIME:-30}
       - PROMETHEUS_POLLTIME=${PROMETHEUS_POLLTIME:-30}
-    command: "infra/controller/dc_switch.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
+      
+      - DDOS_THRESH_PPS=1000   # Umbral de paquetes por segundo para detectar DDoS
+      - DDOS_INTERVAL=2       # Intervalo de poll FlowStats (segundos)
+      - DDOS_BLOCK_TIMEOUT=120 # Segundos hasta que expira el bloqueo automáticament
+      - PORT_SCAN_THRESHOLD=20
+      - PORT_SCAN_WINDOW=5
+      - HTTP_FLOOD_THRESHOLD=10
+      - HTTP_PORTS=80,443
+      - VICTIM_WINDOW=1
+      - VICTIM_SYN_THRESHOLD=300
+      - VICTIM_HTTP_THRESHOLD=50
+      - VICTIM_UNIQUE_SRC_THRESHOLD=3
+      - VICTIM_MIN_SOURCE_EVENTS=5
+
+
+    command: "infra/controller/dc_switch.py  infra/controller/ddos_mitigator.py infra/monitoring/monitor_influxdb.py infra/monitoring/monitor_graphite.py infra/monitoring/monitor_prometheus.py --observe-links"
+    
     volumes:
       - ./infra/controller:/home/auser/infra/controller
       - ./infra/monitoring:/home/auser/infra/monitoring
