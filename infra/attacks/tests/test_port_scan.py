@@ -8,11 +8,14 @@ TARGET = h4.IP()
 
 print(f"\n[PortScan] h1 -> {TARGET}")
 
-print("[PortScan] Ejecutando escaneo SYN...")
+print("[PortScan] Ejecutando escaneo SYN rápido...")
 
-# Lanzar escaneo
+# -Pn evita que el descubrimiento de hosts omita el objetivo.
+# --min-rate garantiza que se visiten al menos 20 puertos durante la
+# ventana de detección de 5 s configurada en el mitigador.
 h1.cmd(
-    f"nmap -sS -p 1-1024 {TARGET} > /dev/null 2>&1 &"
+    f"nmap -Pn -n -sS --min-rate 100 -p 1-100 {TARGET} "
+    "> /dev/null 2>&1 &"
 )
 
 # Esperar detección + instalación OpenFlow
@@ -49,3 +52,6 @@ print(
 
 # Limpiar procesos nmap
 h1.cmd("pkill nmap 2>/dev/null")
+
+if not blocked:
+    raise SystemExit("El mitigador no bloqueó el port scan")

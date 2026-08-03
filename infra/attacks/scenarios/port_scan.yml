@@ -12,8 +12,9 @@ attackers:
 
 tool: nmap
 params:
-  flags: "-sS -p 1-1024"
-  duration_seconds: 120
+  # 20 puertos únicos deben llegar en PORT_SCAN_WINDOW=5 s.
+  flags: "-Pn -n -sS --min-rate 100 -p 1-100"
+  duration_seconds: 10
 
 # Uso manual en Mininet CLI:
-# h1 nmap -sS -p 1-1024 10.1.1.4
+# h1 nmap -Pn -n -sS --min-rate 100 -p 1-100 10.1.1.4
