@@ -1,24 +1,24 @@
-# Escenario: HTTP Flood con curl
+# Escenario: HTTP Flood con Apache Benchmark
 # Objetivo: Verificar que HTTP flood se detecta sin bloquear por SYN.
 #
 # Casos de prueba:
-#   curl concurrente: SYN iniciales + HTTP → HTTP_CANDIDATE → BLOCKED
+#   ab con keep-alive: pocos SYN + muchos HTTP → BLOCKED(HTTP_FLOOD)
 
 
 scenario:
-  name: "HTTP Flood — curl concurrente"
-  id: http_flood_curl
+  name: "HTTP Flood — Apache Benchmark"
+  id: http_flood_ab
   version: "1.0"
   category: http_flood
   severity: high
   description: |
-    HTTP flood usando curl, disponible en la imagen de Mininet.
-    Se envían 30 GET concurrentes: superan HTTP_FLOOD_THRESHOLD=10 req/s,
-    sin alcanzar SYN_FLOOD_THRESHOLD=100 SYN/s.
+    HTTP flood usando Apache Benchmark (ab) con conexiones persistentes.
+    Se abren 10 conexiones y se envían 200 GET: supera
+    HTTP_FLOOD_THRESHOLD=10 req/s sin alcanzar SYN_FLOOD_THRESHOLD=100 SYN/s.
 
 attack:
-  tool: curl
-  command_template: "for i in $(seq 1 30); do curl -sS --http1.0 --max-time 2 http://{target}/ > /dev/null & done; wait"
+  tool: ab
+  command_template: "ab -k -c 10 -n 200 -s 5 http://{target}/"
 
 topology:
   attacker: h2

@@ -670,7 +670,6 @@ nmap -sS -p 1-100 TARGET
 #       Ataque port scan:
 Comando:
 ```bash
-h5 nmap -sS -p 1-1024 10.1.1.4
 
 h1 nmap -sS 10.1.1.1/24
 

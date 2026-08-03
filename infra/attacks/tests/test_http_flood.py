@@ -17,14 +17,14 @@ h4.cmd(
 
 time.sleep(1)
 
-print("[HTTPFlood] Lanzando flood HTTP...")
+print("[HTTPFlood] Lanzando flood HTTP con Apache Benchmark...")
 
-# 30 GET concurrentes superan HTTP_FLOOD_THRESHOLD=10 req/s, pero quedan
-# muy por debajo de SYN_FLOOD_THRESHOLD=100 SYN/s.
+# Keep-alive limita la apertura a 10 conexiones (menos de
+# SYN_FLOOD_THRESHOLD=100) y genera suficientes GET para superar
+# HTTP_FLOOD_THRESHOLD=10 dentro de su ventana de un segundo.
 h2.cmd(
-    f"for i in $(seq 1 30); do "
-    f"curl -sS --http1.0 --max-time 2 http://{TARGET}/ > /dev/null & "
-    "done; wait"
+    f"ab -k -c 10 -n 200 -s 5 http://{TARGET}/ "
+    "> /tmp/http_flood_ab.log 2>&1"
 )
 
 print("[HTTPFlood] Esperando detección y mitigación...")
@@ -63,7 +63,6 @@ print(
 
 print("[HTTPFlood] Limpiando procesos...")
 
-h2.cmd("pkill curl 2>/dev/null")
 h4.cmd("pkill -f 'python3 -m http.server 80' 2>/dev/null || true")
 
 if not blocked:
