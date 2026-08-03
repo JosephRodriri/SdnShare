@@ -83,11 +83,14 @@ VICTIM_ALERT_COOLDOWN = float(os.environ.get("VICTIM_ALERT_COOLDOWN", 2.0))
 # ── OpenFlow priorities 
 BLOCK_PRIORITY     = 1000
 INTERCEPT_PRIORITY = 500
+# SYN debe tener prioridad sobre la inspección HTTP: un SYN dirigido a un
+# puerto HTTP sigue alimentando el detector de SYN/port scan.
+HTTP_INTERCEPT_PRIORITY = INTERCEPT_PRIORITY - 1
 BLOCK_TABLE        = 0
 
 # ── max_len por tipo de intercepción 
 SYN_MAXLEN  = 128   # Headers L4 completos: ~54 bytes
-HTTP_MAXLEN = 256   # Inicio del payload HTTP: suficiente para el verbo
+HTTP_MAXLEN = 512   # Cabeceras HTTP completas para requests normales del lab
 
 # ── HTTP methods 
 HTTP_METHODS = (
@@ -341,27 +344,28 @@ class DDoSMitigator(app_manager.RyuApp):
             match=match_syn, instructions=syn_inst, command=ofproto.OFPFC_ADD,
         ))
 
-        # ── Reglas PSH/HTTP: tcp_flags=(0x008, 0x008) -> PSH=1 
-        psh_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, HTTP_MAXLEN)]
-        psh_inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, psh_act)]
+        # ── Reglas HTTP: inspeccionar TCP hacia los puertos HTTP.
+        # No se depende de PSH: ese flag es una sugerencia del stack TCP y
+        # algunos clientes válidos no lo establecen en el segmento con el GET.
+        http_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, HTTP_MAXLEN)]
+        http_inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, http_act)]
         for port in HTTP_PORTS:
-            match_psh = parser.OFPMatch(
+            match_http = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_IP,
                 ip_proto=6,
                 tcp_dst=port,
-                tcp_flags=(0x008, 0x008),
             )
             dp.send_msg(parser.OFPFlowMod(
                 datapath=dp, table_id=BLOCK_TABLE,
-                priority=INTERCEPT_PRIORITY, idle_timeout=0, hard_timeout=0,
-                match=match_psh, instructions=psh_inst, command=ofproto.OFPFC_ADD,
+                priority=HTTP_INTERCEPT_PRIORITY, idle_timeout=0, hard_timeout=0,
+                match=match_http, instructions=http_inst, command=ofproto.OFPFC_ADD,
             ))
 
         log.info(
             "[DDoS] dpid=%-5d -> SYN trap(prio=%d,max=%d) "
-            "PSH×%d(prio=%d,max=%d) instaladas",
+            "HTTP TCP×%d(prio=%d,max=%d) instaladas",
             dp.id, INTERCEPT_PRIORITY, SYN_MAXLEN,
-            len(HTTP_PORTS), INTERCEPT_PRIORITY, HTTP_MAXLEN,
+            len(HTTP_PORTS), HTTP_INTERCEPT_PRIORITY, HTTP_MAXLEN,
         )
 
     
@@ -447,7 +451,7 @@ class DDoSMitigator(app_manager.RyuApp):
           1. Parse rápido del paquete
           2. Aprender MAC->IP
           3. Obtener (o crear) IpContext para src_ip
-          4. Actualizar contexto según tipo de paquete (SYN / PSH-HTTP)
+          4. Actualizar contexto según tipo de paquete (SYN / HTTP)
           5. Evaluar transiciones de estado
         """
         self._update_packetin_stats()
@@ -481,7 +485,6 @@ class DDoSMitigator(app_manager.RyuApp):
         flags    = tcp_pkt.bits
         dst_port = tcp_pkt.dst_port
         is_syn   = bool(flags & 0x02) and not bool(flags & 0x10)
-        is_psh   = bool(flags & 0x08)
 
         ctx = self._get_or_create_ctx(src_ip)
         now = time.time()
@@ -504,8 +507,8 @@ class DDoSMitigator(app_manager.RyuApp):
 
             self._evaluate_syn(ctx, src_ip, syn_count, now, datapath.id)
 
-        # ── Paquete PSH hacia puerto HTTP -> DPI 
-        if is_psh and dst_port in HTTP_PORTS:
+        # ── Paquete TCP hacia puerto HTTP -> DPI
+        if dst_port in HTTP_PORTS:
             payload = self._extract_tcp_payload(pkt)
             if payload and self._is_http_request(payload):
                 http_count = ctx.slide_http(now)

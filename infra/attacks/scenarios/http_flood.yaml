@@ -1,47 +1,24 @@
-# Escenario: HTTP Flood con Apache Benchmark
+# Escenario: HTTP Flood con curl
 # Objetivo: Verificar que HTTP flood se detecta sin bloquear por SYN.
 #
 # Casos de prueba:
-#   A) ab sin keep-alive: genera SYN iniciales + HTTP → HTTP_CANDIDATE → BLOCKED
-#   B) ab con keep-alive: pocos SYN, muchos HTTP → OBSERVING → BLOCKED(HTTP)
+#   curl concurrente: SYN iniciales + HTTP → HTTP_CANDIDATE → BLOCKED
 
 
 scenario:
-  name: "HTTP Flood — Apache Benchmark"
-  id: http_flood_ab
+  name: "HTTP Flood — curl concurrente"
+  id: http_flood_curl
   version: "1.0"
   category: http_flood
   severity: high
   description: |
-    HTTP flood usando Apache Benchmark (ab).
-    
-    Caso A (sin keep-alive, -c concurrencia alta):
-      ab -c 100 -n 2000 http://TARGET/
-      → ~100 SYN iniciales + HTTP GET requests
-      → SYN_CANDIDATE (si SYN > 100) → HTTP_CANDIDATE → BLOCKED(HTTP_FLOOD)
-    
-    Caso B (con keep-alive, -k):
-      ab -k -c 10 -n 500 http://TARGET/
-      → 10 SYN (1 por worker) + 500 HTTP (keep-alive)
-      → OBSERVING → HTTP count > threshold=10 → BLOCKED(HTTP_FLOOD)
-    
-    Diferencia crítica de v8: Caso A NO debe bloquearse como SYN_FLOOD.
-    El período de gracia + ratio HTTP/SYN ≥ 0.2 debe clasificarlo como HTTP.
+    HTTP flood usando curl, disponible en la imagen de Mininet.
+    Se envían 30 GET concurrentes: superan HTTP_FLOOD_THRESHOLD=10 req/s,
+    sin alcanzar SYN_FLOOD_THRESHOLD=100 SYN/s.
 
 attack:
-  tool: ab
-  variants:
-    - name: "sin keep-alive (alta concurrencia)"
-      command_template: "ab -c {concurrency} -n {requests} http://{target}/"
-      parameters:
-        concurrency: 100
-        requests: 2000
-
-    - name: "con keep-alive (baja SYN)"
-      command_template: "ab -k -c {concurrency} -n {requests} http://{target}/"
-      parameters:
-        concurrency: 10
-        requests: 500
+  tool: curl
+  command_template: "for i in $(seq 1 30); do curl -sS --http1.0 --max-time 2 http://{target}/ > /dev/null & done; wait"
 
 topology:
   attacker: h2

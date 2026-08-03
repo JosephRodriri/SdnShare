@@ -10,19 +10,22 @@ print(f"\n[HTTPFlood] h2 -> http://{TARGET}/")
 
 # Servidor HTTP
 print("[HTTPFlood] Iniciando servidor HTTP...")
+h4.cmd("pkill -f 'python3 -m http.server 80' 2>/dev/null || true")
 h4.cmd(
-    "python3 -m http.server 80 > /dev/null 2>&1 &"
+    "python3 -m http.server 80 > /tmp/http_flood_server.log 2>&1 &"
 )
 
-time.sleep(3)
+time.sleep(1)
 
 print("[HTTPFlood] Lanzando flood HTTP...")
 
-# Flood más agresivo
-for _ in range(500):
-    h2.cmd(
-        f"curl -s http://{TARGET}/ > /dev/null 2>&1 &"
-    )
+# 30 GET concurrentes superan HTTP_FLOOD_THRESHOLD=10 req/s, pero quedan
+# muy por debajo de SYN_FLOOD_THRESHOLD=100 SYN/s.
+h2.cmd(
+    f"for i in $(seq 1 30); do "
+    f"curl -sS --http1.0 --max-time 2 http://{TARGET}/ > /dev/null & "
+    "done; wait"
+)
 
 print("[HTTPFlood] Esperando detección y mitigación...")
 
@@ -61,4 +64,7 @@ print(
 print("[HTTPFlood] Limpiando procesos...")
 
 h2.cmd("pkill curl 2>/dev/null")
-h4.cmd("pkill python3 2>/dev/null")
+h4.cmd("pkill -f 'python3 -m http.server 80' 2>/dev/null || true")
+
+if not blocked:
+    raise SystemExit("El mitigador no bloqueó el HTTP flood")
