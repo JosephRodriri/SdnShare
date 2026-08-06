@@ -34,10 +34,19 @@ from ryu.app.ofctl.api import get_datapath
 from base_switch import BaseSwitch
 from utils import Network
 
-# Constants
-TABLE0 = 0
+# OpenFlow pipeline
+#
+# Table 0 is reserved for security policies (DROP and PacketIn inspection).
+# Table 1 contains the learning-switch forwarding rules.  Keeping them apart
+# lets the mitigator inspect a copy of HTTP/SYN packets without forcing every
+# packet through the controller before it can be forwarded.
+POLICY_TABLE = 0
+FORWARD_TABLE = 1
 MIN_PRIORITY = 0
-LOW_PRIORITY = 100
+LOW_PRIORITY = 300
+INSPECTED_DROP_PRIORITY = 200
+INSPECTED_METADATA = 1
+INSPECTED_METADATA_MASK = 0xFFFFFFFFFFFFFFFF
 
 # Set idle_time=0 to make flow entries permanent
 IDLE_TIME = 0
@@ -72,9 +81,18 @@ class SpineLeaf1(BaseSwitch):
         # Delete all exiting flows
         msgs = [self.del_flow(datapath)]
 
+        # Policy table: packets that do not match a policy continue to the
+        # forwarding table.  The mitigator installs higher-priority policies
+        # in this table.
+        policy_miss = parser.OFPMatch()
+        policy_inst = [parser.OFPInstructionGotoTable(FORWARD_TABLE)]
+        msgs += [self.add_flow(datapath, POLICY_TABLE, MIN_PRIORITY,
+                               policy_miss, policy_inst)]
+
         if datapath.id in net.leaves:
-            # Add a table-miss entry for TABLE0 table to forward
-            # packets to the controller
+            # Normal table-miss: ask the learning switch to establish a
+            # forwarding entry.  Inspected packets carry metadata=1 and are
+            # handled by the rule below instead, avoiding a duplicate PacketIn.
             match = parser.OFPMatch()
             actions = [
                 parser.OFPActionOutput(
@@ -83,17 +101,24 @@ class SpineLeaf1(BaseSwitch):
             ]
             inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
 
-            msgs += [self.add_flow(datapath, TABLE0, MIN_PRIORITY, match, inst)]
+            msgs += [self.add_flow(datapath, FORWARD_TABLE, MIN_PRIORITY, match, inst)]
+
+            inspected_match = parser.OFPMatch(
+                metadata=(INSPECTED_METADATA, INSPECTED_METADATA_MASK)
+            )
+            msgs += [self.add_flow(datapath, FORWARD_TABLE,
+                                   INSPECTED_DROP_PRIORITY, inspected_match, [])]
 
         else:
-            # Add a table-miss entry for TABLE0 table to drop packets
+            # Spine switches only forward packets for which the learning
+            # switch has installed a concrete rule.
             match = parser.OFPMatch()
             inst = []
 
-            msgs += [self.add_flow(datapath, TABLE0, MIN_PRIORITY, match, inst)]
+            msgs += [self.add_flow(datapath, FORWARD_TABLE, MIN_PRIORITY, match, inst)]
 
-        # Send all messages to the switch
-        self.send_messages(datapath, msgs)
+        # Barrier keeps the switch pipeline ready before traffic arrives.
+        self.send_messages(datapath, msgs, barrier=True)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, event):
@@ -136,7 +161,7 @@ class SpineLeaf1(BaseSwitch):
                 # Both nodes are connected to the same leaf switch
                 msgs += self.create_match_entry(
                     datapath,
-                    TABLE0,
+                    FORWARD_TABLE,
                     LOW_PRIORITY,
                     src,
                     dst,
@@ -159,7 +184,7 @@ class SpineLeaf1(BaseSwitch):
                 upstream_port = net.links[datapath.id, spine_id]["port"]
                 msgs = self.create_match_entry(
                     datapath,
-                    TABLE0,
+                    FORWARD_TABLE,
                     LOW_PRIORITY,
                     src,
                     dst,
@@ -178,7 +203,7 @@ class SpineLeaf1(BaseSwitch):
 
                 msgs = self.create_match_entry(
                     spine_datapath,
-                    TABLE0,
+                    FORWARD_TABLE,
                     LOW_PRIORITY,
                     src,
                     dst,
@@ -198,7 +223,7 @@ class SpineLeaf1(BaseSwitch):
                 downstream_port = net.links[dst_datapath.id, spine_id]["port"]
                 msgs += self.create_match_entry(
                     dst_datapath,
-                    TABLE0,
+                    FORWARD_TABLE,
                     LOW_PRIORITY,
                     src,
                     dst,

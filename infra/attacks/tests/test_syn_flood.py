@@ -30,3 +30,6 @@ print(
 )
 
 h1.cmd("pkill hping3")
+
+if not blocked:
+    raise SystemExit("El mitigador no bloqueó el SYN flood")

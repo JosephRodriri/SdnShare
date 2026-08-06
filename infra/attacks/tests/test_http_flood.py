@@ -17,6 +17,14 @@ h4.cmd(
 
 time.sleep(1)
 
+print("[HTTPFlood] Verificando servidor HTTP...")
+ready = h2.cmd(
+    f"curl -fsS --max-time 3 http://{TARGET}/ > /dev/null 2>&1; echo $?"
+).strip().endswith("0")
+if not ready:
+    h4.cmd("pkill -f 'python3 -m http.server 80' 2>/dev/null || true")
+    raise SystemExit("El servidor HTTP no respondió antes de iniciar el flood")
+
 print("[HTTPFlood] Lanzando flood HTTP con Apache Benchmark...")
 
 # Keep-alive limita la apertura a 10 conexiones (menos de

@@ -86,7 +86,11 @@ INTERCEPT_PRIORITY = 500
 # SYN debe tener prioridad sobre la inspección HTTP: un SYN dirigido a un
 # puerto HTTP sigue alimentando el detector de SYN/port scan.
 HTTP_INTERCEPT_PRIORITY = INTERCEPT_PRIORITY - 1
-BLOCK_TABLE        = 0
+POLICY_TABLE       = 0
+FORWARD_TABLE      = 1
+BLOCK_TABLE        = POLICY_TABLE
+INSPECTED_METADATA = 1
+INSPECTED_METADATA_MASK = 0xFFFFFFFFFFFFFFFF
 
 # ── max_len por tipo de intercepción 
 SYN_MAXLEN  = 128   # Headers L4 completos: ~54 bytes
@@ -221,6 +225,7 @@ class DDoSMitigator(app_manager.RyuApp):
         # ── Estado de IPs bloqueadas (compatibilidad con _trigger_mitigation) 
         self._blocked: set = set()
         self._blocked_dpids: dict = {}
+        self._blocked_until: dict = {}
 
         # ── NUEVO v8: Contexto por IP (reemplaza múltiples dicts separados) 
         # { src_ip -> IpContext }
@@ -332,7 +337,12 @@ class DDoSMitigator(app_manager.RyuApp):
 
         # ── Regla SYN: tcp_flags=(0x002, 0x012) -> SYN=1, ACK=0 
         syn_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, SYN_MAXLEN)]
-        syn_inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, syn_act)]
+        syn_inst = [
+            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, syn_act),
+            parser.OFPInstructionWriteMetadata(INSPECTED_METADATA,
+                                               INSPECTED_METADATA_MASK),
+            parser.OFPInstructionGotoTable(FORWARD_TABLE),
+        ]
         match_syn = parser.OFPMatch(
             eth_type=ether_types.ETH_TYPE_IP,
             ip_proto=6,
@@ -347,8 +357,16 @@ class DDoSMitigator(app_manager.RyuApp):
         # ── Reglas HTTP: inspeccionar TCP hacia los puertos HTTP.
         # No se depende de PSH: ese flag es una sugerencia del stack TCP y
         # algunos clientes válidos no lo establecen en el segmento con el GET.
-        http_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, HTTP_MAXLEN)]
-        http_inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, http_act)]
+        # Request the complete packet because dc_switch uses the PacketIn data
+        # to forward the first packet of a previously unknown flow.
+        http_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                             ofproto.OFPCML_NO_BUFFER)]
+        http_inst = [
+            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, http_act),
+            parser.OFPInstructionWriteMetadata(INSPECTED_METADATA,
+                                               INSPECTED_METADATA_MASK),
+            parser.OFPInstructionGotoTable(FORWARD_TABLE),
+        ]
         for port in HTTP_PORTS:
             match_http = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_IP,
@@ -363,7 +381,7 @@ class DDoSMitigator(app_manager.RyuApp):
 
         log.info(
             "[DDoS] dpid=%-5d -> SYN trap(prio=%d,max=%d) "
-            "HTTP TCP×%d(prio=%d,max=%d) instaladas",
+            "HTTP TCP×%d(prio=%d,max=full) instaladas",
             dp.id, INTERCEPT_PRIORITY, SYN_MAXLEN,
             len(HTTP_PORTS), HTTP_INTERCEPT_PRIORITY, HTTP_MAXLEN,
         )
@@ -843,6 +861,7 @@ class DDoSMitigator(app_manager.RyuApp):
             return
 
         self._blocked.add(src_ip)
+        self._blocked_until[src_ip] = time.time() + BLOCK_IDLE_TIMEOUT
         self._stats["total_blocked"] += 1
         self._stats[attack_type.lower()] = \
             self._stats.get(attack_type.lower(), 0) + 1
@@ -899,7 +918,9 @@ class DDoSMitigator(app_manager.RyuApp):
             table_id=BLOCK_TABLE,
             priority=BLOCK_PRIORITY,
             idle_timeout=BLOCK_IDLE_TIMEOUT,
-            hard_timeout=0,
+            # A hard timeout prevents stale controller state when a switch
+            # reconnects or an attacker keeps matching the DROP rule forever.
+            hard_timeout=BLOCK_IDLE_TIMEOUT,
             match=match,
             instructions=[],
             command=ofproto.OFPFC_ADD,
@@ -937,6 +958,7 @@ class DDoSMitigator(app_manager.RyuApp):
 
         self._blocked.discard(src_ip)
         self._ip_ctx.pop(src_ip, None)   # limpiar todo el contexto
+        self._blocked_until.pop(src_ip, None)
 
         log.info(
             "[DDoS] Bloqueo expirado: ip=%s pkts=%d bytes=%d -> monitoreo reiniciado",
@@ -955,6 +977,20 @@ class DDoSMitigator(app_manager.RyuApp):
     def _cleanup_stale_contexts(self):
         """Elimina IpContext de IPs inactivas (no bloqueadas)."""
         now     = time.time()
+        expired_blocks = [
+            ip for ip, deadline in self._blocked_until.items()
+            if now >= deadline
+        ]
+        for ip in expired_blocks:
+            # Fallback for switches that disconnected before sending
+            # OFPFlowRemoved.  The hard timeout above guarantees that the
+            # dataplane rule has the same maximum lifetime.
+            self._blocked.discard(ip)
+            self._blocked_dpids.pop(ip, None)
+            self._blocked_until.pop(ip, None)
+            self._ip_ctx.pop(ip, None)
+            log.info("[DDoS] Bloqueo expirado por limpieza: ip=%s", ip)
+
         stale   = [
             ip for ip, ctx in self._ip_ctx.items()
             if ctx.state != IpState.BLOCKED
