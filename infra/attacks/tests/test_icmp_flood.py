@@ -30,3 +30,6 @@ print(
 )
 
 h3.cmd("pkill hping3")
+
+if not blocked:
+    raise SystemExit("El mitigador no bloqueó el ICMP flood")

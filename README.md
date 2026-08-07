@@ -322,6 +322,21 @@ El laboratorio incluye un pipeline completo para construir datasets y entrenar m
 
 Los modelos y el entrenamiento están en la carpeta [ml/](ml/) y el pipeline de datos en [pipeline/](pipeline/).
 
+### Cierre de una captura con telemetría y mitigación
+
+`make capture` crea el directorio y su `metadata.json`. Tras ejecutar el
+experimento, ciérralo con el mismo identificador para exportar los datos del
+intervalo desde InfluxDB y los eventos de mitigación:
+
+```bash
+make finalize CAPTURE_RUN_ID=<run_id>
+```
+
+El directorio de la ejecución contendrá `port_stats.csv`, `flow_stats.csv` y
+`mitigation_events.jsonl`. El controlador también mantiene el registro global
+de eventos en `data/mitigation_events.jsonl`; no debe usarse directamente como
+dataset porque contiene eventos de todas las ejecuciones.
+
 ---
 
 ## Solución de problemas

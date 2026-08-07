@@ -28,6 +28,9 @@ python3 scripts/generate_run_id.py --create-dir
 
 # El directorio data/raw/{run_id}/ se crea con metadata.json
 # EDITAR metadata.json con los parámetros del experimento ANTES de capturar
+
+# Al terminar, exportar las métricas y los eventos de mitigación de esa sesión
+make finalize CAPTURE_RUN_ID=<run_id>
 ```
 
 > ⚠️ **Nunca commitear archivos en `data/`** — el `.gitignore` ya los excluye.

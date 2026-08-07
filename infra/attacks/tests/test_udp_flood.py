@@ -30,3 +30,6 @@ print(
 )
 
 h2.cmd("pkill hping3")
+
+if not blocked:
+    raise SystemExit("El mitigador no bloqueó el UDP flood")
