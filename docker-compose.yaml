@@ -9,6 +9,7 @@ services:
       - GRAPHITE_POLLTIME=${GRAPHITE_POLLTIME:-30}
       - INFLUXDB_HOST=influxdb
       - INFLUXDB_POLLTIME=${INFLUXDB_POLLTIME:-30}
+      - MITIGATION_EVENTS_FILE=/data/mitigation_events.jsonl
       - PROMETHEUS_POLLTIME=${PROMETHEUS_POLLTIME:-30}
       
       - DDOS_THRESH_PPS=1000   # Umbral de paquetes por segundo para detectar DDoS
@@ -31,6 +32,7 @@ services:
       - ./infra/controller:/home/auser/infra/controller
       - ./infra/monitoring:/home/auser/infra/monitoring
       - ./infra/configs:/home/auser/infra/configs
+      - ./data:/data
     ports:
       - "6633" # OpenFlow
       - "6653" # OpenFlow
@@ -98,8 +100,8 @@ services:
   influxdb:
     image: influxdb:1.8
     volumes:
-      - ./influxdb/data:/var/lib/influxdb2
-      - ./influxdb/config:/etc/influxdb2
+      - ./influxdb/data:/var/lib/influxdb
+      - ./influxdb/config:/etc/influxdb
     ports:
       - "8086:8086"
     profiles:

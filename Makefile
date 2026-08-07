@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════
 # SDN DDoS Detection Lab — Makefile
 # ═══════════════════════════════════════════════════════════
-.PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture process train predict test lint clean
+.PHONY: help setup up down topo topo-clean sniff sniff-save monitor capture finalize process train predict test lint clean
 
 # Colores
 CYAN  := \033[36m
@@ -88,6 +88,10 @@ capture: ## Inicia captura de datos (genera run_id automático)
 	python3 scripts/generate_run_id.py --create-dir
 	@echo "$(GREEN)✓ Directorio de captura creado en data/raw/$(RUN_ID)$(RESET)"
 	@echo "  Inicia la captura manualmente y guarda los datos en ese directorio"
+
+finalize: ## Exporta métricas y eventos (CAPTURE_RUN_ID=<id>)
+	@test -n "$(CAPTURE_RUN_ID)" || (echo "Usa: make finalize CAPTURE_RUN_ID=<run_id>"; exit 1)
+	python3 scripts/finalize_capture.py $(CAPTURE_RUN_ID)
 
 # ─── ML (futuro) ──────────────────────────────────────────
 

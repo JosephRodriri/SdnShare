@@ -16,7 +16,7 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Directorio raíz del proyecto (relativo al script)
@@ -49,7 +49,11 @@ def create_run_directory(run_id: str) -> Path:
             metadata = json.load(f)
 
         metadata["run_id"] = run_id
-        metadata["created_at"] = datetime.now().isoformat()
+        # RFC 3339 in UTC makes it possible to filter InfluxDB and mitigation
+        # events reliably when the capture is finalized.
+        created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        metadata["created_at"] = created_at
+        metadata["capture_started_at"] = created_at
 
         with open(metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)

@@ -3,11 +3,13 @@ MIT License
 Copyright (c) 2024
 """
 
+import json
 import logging
 import os
 import time
 from collections import defaultdict, deque
 from enum import Enum, auto
+from pathlib import Path
 from typing import Optional
 
 import yaml
@@ -20,6 +22,10 @@ from ryu.ofproto import ofproto_v1_3
 
 log = logging.getLogger("ddos_mitigator")
 log.setLevel(logging.DEBUG)
+
+# JSON Lines is deliberately used so events can be appended safely while the
+# controller runs and later copied into the directory of a specific run.
+MITIGATION_EVENTS_FILE = os.environ.get("MITIGATION_EVENTS_FILE", "")
 
 
 # CONFIGURACIÓN
@@ -904,6 +910,30 @@ class DDoSMitigator(app_manager.RyuApp):
             f" block_timeout={BLOCK_IDLE_TIMEOUT}",
             flush=True,
         )
+        self._write_mitigation_event({
+            "event_type": "mitigation_applied",
+            "timestamp": block_ts,
+            "src_ip": src_ip,
+            "attack_type": attack_type,
+            "detail": detail,
+            "dpid_origen": src_dpid,
+            "dpids_bloqueados": installed_on,
+            "block_timeout": BLOCK_IDLE_TIMEOUT,
+            "expires_at": expire_ts,
+        })
+
+    def _write_mitigation_event(self, event: dict) -> None:
+        """Append one durable mitigation event when persistence is enabled."""
+        if not MITIGATION_EVENTS_FILE:
+            return
+        try:
+            event_file = Path(MITIGATION_EVENTS_FILE)
+            event_file.parent.mkdir(parents=True, exist_ok=True)
+            with event_file.open("a", encoding="utf-8") as output:
+                json.dump(event, output, sort_keys=True)
+                output.write("\n")
+        except OSError:
+            log.exception("No se pudo persistir el evento de mitigación")
 
     def _install_block_rule(self, datapath, src_ip: str):
         """Instala regla DROP priority=1000 para la IP atacante."""
@@ -964,6 +994,14 @@ class DDoSMitigator(app_manager.RyuApp):
             "[DDoS] Bloqueo expirado: ip=%s pkts=%d bytes=%d -> monitoreo reiniciado",
             src_ip, msg.packet_count, msg.byte_count,
         )
+        self._write_mitigation_event({
+            "event_type": "mitigation_expired",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "src_ip": src_ip,
+            "dpid": msg.datapath.id,
+            "packets_dropped": msg.packet_count,
+            "bytes_dropped": msg.byte_count,
+        })
 
     
     # LIMPIEZA PERIÓDICA
