@@ -137,7 +137,7 @@ PPS=\frac{\Delta\ Packets}{\Delta\ Time}
 ## Threshold configurado
 
 ```python
-DDOS_THRESH_PPS = 1000
+DDOS_THRESH_PPS = 20000
 ```
 
 Si el tráfico supera este valor:
@@ -397,4 +397,3 @@ Los thresholds pueden requerir ajuste según entorno.
 El sistemq trabaja principalmente con tráfico local.
 
 ---
-

@@ -32,7 +32,7 @@ MITIGATION_EVENTS_FILE = os.environ.get("MITIGATION_EVENTS_FILE", "")
 
 
 # ── FlowStats (UDP/ICMP volumétrico) - CAPA 1
-DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS",       1000))
+DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS",       20000))
 POLL_INTERVAL      = int(os.environ.get("DDOS_INTERVAL",            2))
 BLOCK_IDLE_TIMEOUT = int(os.environ.get("DDOS_BLOCK_TIMEOUT",     120))
 

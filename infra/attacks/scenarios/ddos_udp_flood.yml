@@ -1,6 +1,6 @@
 # DDoS UDP Flood
 name: ddos_udp_flood
-description: "Ataque DDoS tipo UDP flood desde múltiples hosts hacia un objetivo"
+description: "Ataque DDoS UDP volumétrico: cada atacante debe superar 20000 pps"
 label: ATTACK
 
 target:
@@ -19,6 +19,7 @@ params:
   duration_seconds: 60
 
 # Uso manual en Mininet CLI:
+# Cada fuente se evalúa de forma independiente por el detector FlowStats.
 # h1 hping3 --flood --udp -p 53 10.1.1.4 &
 # h2 hping3 --flood --udp -p 53 10.1.1.4 &
 # h3 hping3 --flood --udp -p 53 10.1.1.4 &

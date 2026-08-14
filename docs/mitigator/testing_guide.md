@@ -101,7 +101,7 @@ docker-compose.yaml
 Current configuration:
 
 ```yaml
-- DDOS_THRESH_PPS=1000
+- DDOS_THRESH_PPS=20000
 - DDOS_INTERVAL=2
 - DDOS_BLOCK_TIMEOUT=120
 
@@ -709,8 +709,6 @@ h3 hping3 --icmp --flood 10.1.1.4
 
 py exec(open('infra/attacks/tests/test_icmp_flood.py').read())
 ```
-
-
 
 
 

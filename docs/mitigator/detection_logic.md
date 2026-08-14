@@ -453,12 +453,12 @@ delta = pkt_total - prev
 pps   = delta / POLL_INTERVAL
 ```
 
-Si `POLL_INTERVAL = 2` segundos y en ese período se registraron 4.000 paquetes adicionales:
+Si `POLL_INTERVAL = 2` segundos y en ese período se registraron 40.000 paquetes adicionales:
 ```
-pps = 4000 / 2 = 2000 paquetes/segundo
+pps = 40000 / 2 = 20000 paquetes/segundo
 ```
 
-Si `pps ≥ DDOS_THRESH_PPS = 1000`:
+Si `pps ≥ DDOS_THRESH_PPS = 20000`:
 ```
 → VOLUMETRIC_FLOOD detectado
 ```
@@ -486,7 +486,7 @@ Este filtro intenta excluir flujos TCP del análisis volumétrico. Sin embargo, 
 En la práctica, esto significa que el FlowStats volumétrico puede incluir tráfico TCP en su conteo. Sin embargo, esto no es un problema operacional porque:
 1. Los SYN floods son detectados por PacketIn en <2 segundos, mucho antes de que FlowStats acumule suficiente delta.
 2. Si un SYN flood también dispara el detector FlowStats, `self._blocked` previene la instalación duplicada de reglas DROP.
-3. El threshold `DDOS_THRESH_PPS = 1000` está calibrado por encima del tráfico TCP legítimo normal en el laboratorio.
+3. El threshold `DDOS_THRESH_PPS = 20000` está calibrado por encima del tráfico TCP legítimo normal en el laboratorio.
 
 ---
 
@@ -561,7 +561,7 @@ Esto permite detectar un atacante que combina port scan con HTTP flood, clasific
 | Browser cargando web (10-20 SYN/s) | Bajo | Threshold=100 >> 20 |
 | ab sin keep-alive (`-c 50`) | Medio | FSM: SYN_CANDIDATE + gracia HTTP |
 | ab con keep-alive (`-k -c 200`) | Bajo | Pocos SYN; detector HTTP por req count |
-| iperf3 TCP (muchos paquetes) | Medio | FlowStats threshold alto (1000 pps) |
+| iperf3 TCP (muchos paquetes) | Medio | FlowStats threshold alto (20000 pps) |
 | Servidor con muchas conexiones | Bajo | IP_WHITELIST configurable |
 | Scan de seguridad interno | Bajo | IP_WHITELIST para herramientas internas |
 

@@ -439,7 +439,7 @@ The mitigation system is configured through environment variables in `docker-com
 Example:
 
 ```yaml
-- DDOS_THRESH_PPS=1000
+- DDOS_THRESH_PPS=20000
 - DDOS_INTERVAL=2
 - DDOS_BLOCK_TIMEOUT=120
 - PORT_SCAN_THRESHOLD=10
@@ -509,5 +509,4 @@ PORT_SCAN detected
 | OpenFlow distributed blocking | Network-wide protection       |
 
 ---
-
 

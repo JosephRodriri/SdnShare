@@ -24,7 +24,7 @@ Un quinto componente transversal es la **Finite State Machine (FSM)** que correl
 ## 2. Bloque de configuración
 
 ```python
-DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS", 1000))
+DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS", 20000))
 POLL_INTERVAL      = int(os.environ.get("DDOS_INTERVAL",      2))
 SYN_FLOOD_THRESHOLD = int(os.environ.get("SYN_FLOOD_THRESHOLD", 100))
 SYN_GRACE_MS        = int(os.environ.get("SYN_GRACE_MS",        100))
@@ -239,9 +239,9 @@ delta = pkt_total - prev
 pps   = delta / POLL_INTERVAL
 ```
 
-Si en los últimos 2 segundos llegaron 4.000 paquetes más desde esta MAC:
+Si en los últimos 2 segundos llegaron 40.000 paquetes más desde esta MAC:
 ```
-pps = 4000 / 2 = 2000 paquetes/segundo > DDOS_THRESH_PPS=1000 → ATAQUE
+pps = 40000 / 2 = 20000 paquetes/segundo ≥ DDOS_THRESH_PPS=20000 → ATAQUE
 ```
 
 La detección por delta es más robusta que usar el contador absoluto porque el counter acumulado siempre crece. El delta mide la **tasa de llegada en el intervalo**, que es lo que indica un flood activo.

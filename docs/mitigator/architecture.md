@@ -470,7 +470,7 @@ para evitar interferencia con SYN/HTTP detection.
 ## Threshold
 
 ```python
-DDOS_THRESH_PPS = 1000
+DDOS_THRESH_PPS = 20000
 ```
 
 ---

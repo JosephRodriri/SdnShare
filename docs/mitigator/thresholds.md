@@ -74,7 +74,7 @@ Ejemplo:
 
 ```yaml
 environment:
-  - DDOS_THRESH_PPS=1000
+  - DDOS_THRESH_PPS=20000
   - DDOS_INTERVAL=2
   - DDOS_BLOCK_TIMEOUT=120
   - PORT_SCAN_THRESHOLD=10
@@ -97,7 +97,7 @@ Detectar ataques volumétricos de alto tráfico UDP o ICMP utilizando estadísti
 
 | Variable             | Valor  | Descripción                    |
 | -------------------- | ------ | ------------------------------ |
-| `DDOS_THRESH_PPS`    | `1000` | Umbral de paquetes por segundo |
+| `DDOS_THRESH_PPS`    | `20000` | Umbral de paquetes por segundo |
 | `DDOS_INTERVAL`      | `2s`   | Intervalo de polling FlowStats |
 | `DDOS_BLOCK_TIMEOUT` | `120s` | Tiempo de bloqueo              |
 
@@ -126,14 +126,14 @@ PPS = \frac{\Delta paquetes}{\Delta tiempo}
 
 ## Justificación del Threshold
 
-El valor `1000 PPS` fue seleccionado porque:
+El valor `20000 PPS` fue seleccionado porque:
 
 * tráfico normal del laboratorio:
 
   * ~10–200 PPS
 * flood UDP/ICMP:
 
-  * > 5000 PPS fácilmente
+  * > 20000 PPS con varios procesos `hping3 --flood` por atacante
 * minimiza falsos positivos
 
 ---
@@ -490,5 +490,3 @@ En entornos reales se recomienda:
 * detección multi-switch
 
 ---
-
-
