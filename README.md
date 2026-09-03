@@ -234,9 +234,9 @@ mininet> py exec(open('scripts/traffic_gen.py').read())
 ### Simular ataques DDoS (desde un host específico)
 
 ```
-mininet> h1 hping3 -S --flood -V -p 80 10.0.0.2    # TCP SYN flood
-mininet> h1 hping3 --udp --flood -V 10.0.0.2        # UDP flood
-mininet> h1 nmap -sS 10.0.0.0/24                    # Port scan
+mininet> h1 hping3 -S --flood -V -p 80 10.1.1.2        # TCP SYN flood
+mininet> h1 hping3 --udp --flood -V 10.1.1.2            # UDP flood
+mininet> h1 nmap -sS 10.1.1.0/24                        # Port scan (subnet scan)
 ```
 
 ### Captura de paquetes desde Mininet

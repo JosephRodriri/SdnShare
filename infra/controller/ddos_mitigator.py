@@ -32,7 +32,7 @@ MITIGATION_EVENTS_FILE = os.environ.get("MITIGATION_EVENTS_FILE", "")
 
 
 # ── FlowStats (UDP/ICMP volumétrico) - CAPA 1
-DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS",       20000))
+DDOS_THRESH_PPS    = int(os.environ.get("DDOS_THRESH_PPS",        1000))
 POLL_INTERVAL      = int(os.environ.get("DDOS_INTERVAL",            2))
 BLOCK_IDLE_TIMEOUT = int(os.environ.get("DDOS_BLOCK_TIMEOUT",     120))
 
@@ -108,6 +108,14 @@ HTTP_METHODS = (
     b"DELETE ", b"PATCH ", b"OPTIONS ", b"CONNECT ", b"TRACE ",
 )
 
+# ── Campos L4 en match de FlowStats para excluir del conteo volumétrico 
+# Reglas con estos campos representan tráfico TCP/UDP/ICMP y no deben
+# contarse como volumen bruto (FlowStats solo detecta UDP/ICMP flood).
+_L4_MATCH_FIELDS = frozenset({
+    "ip_proto", "tcp_src", "tcp_dst", "udp_src", "udp_dst",
+    "icmpv4_type", "icmpv4_code", "tcp_flags",
+})
+
 
 
 # ESTADO DE CLASIFICACIÓN POR IP
@@ -147,6 +155,7 @@ class IpContext:
         "syn_candidate_ts", # timestamp en que entró a SYN_CANDIDATE
         "http_ts",          # deque de timestamps HTTP (sliding window)
         "portscan_ports",   # set de puertos únicos contactados
+        "portscan_dst_ips", # set de IPs destino únicas (detección subnet scan)
         "portscan_wstart",  # inicio de ventana port scan
         "last_seen",        # último timestamp de actividad
     )
@@ -157,6 +166,7 @@ class IpContext:
         self.syn_candidate_ts = None   # cuando entró a SYN_CANDIDATE
         self.http_ts          = deque()
         self.portscan_ports   = set()
+        self.portscan_dst_ips = set()  # IPs destino únicas para detección subnet scan
         self.portscan_wstart  = None
         self.last_seen        = time.time()
 
@@ -202,7 +212,8 @@ class IpContext:
             f"IpContext(state={self.state.name}, "
             f"SYN={self.syn_count}, HTTP={self.http_count}, "
             f"ratio={self.http_syn_ratio:.2f}, "
-            f"ports={len(self.portscan_ports)})"
+            f"ports={len(self.portscan_ports)}, "
+            f"dst_ips={len(self.portscan_dst_ips)})"
         )
 
 
@@ -273,7 +284,7 @@ class DDoSMitigator(app_manager.RyuApp):
             "[DDoS]  FlowStats (UDP/ICMP): thresh=%d pps | poll=%ds\n"
             "[DDoS]  SYN Flood:  thresh=%d SYN/%.1fs | grace=%dms | ratio_min=%.1f\n"
             "[DDoS]  HTTP Flood: thresh=%d req/%.1fs | puertos=%s\n"
-            "[DDoS]  Port Scan:  thresh=%d puertos/%ds\n"
+            "[DDoS]  Port Scan:  thresh=%d puertos o dst_ips/%ds\n"
             "[DDoS]  Victim agg:  SYN=%d HTTP=%d srcs=%d window=%.1fs\n"
             "[DDoS]  Block timeout: %ds | Whitelist: %s\n"
             "[DDoS]  Intercept switches: %s\n"
@@ -398,9 +409,15 @@ class DDoSMitigator(app_manager.RyuApp):
 
     def _poll_loop(self):
         hub.sleep(POLL_INTERVAL * 3)
+        log.info("[DDoS-A] Polling loop iniciado (intervalo=%ds)", POLL_INTERVAL)
         while True:
-            for dp in list(self._datapaths.values()):
-                self._request_flow_stats(dp)
+            if not self._datapaths:
+                log.debug("[DDoS-A] Polling: sin datapaths registrados")
+            else:
+                for dp in list(self._datapaths.values()):
+                    self._request_flow_stats(dp)
+                log.debug("[DDoS-A] Polling: stats solicitados a %d switches",
+                          len(self._datapaths))
             hub.sleep(POLL_INTERVAL)
 
     def _request_flow_stats(self, datapath):
@@ -419,6 +436,9 @@ class DDoSMitigator(app_manager.RyuApp):
         dpid    = ev.msg.datapath.id
         body    = ev.msg.body
         current = defaultdict(int)
+        skipped = 0
+        counted = 0
+        total_rules = len(body)
 
         for stat in body:
             if stat.priority in (BLOCK_PRIORITY, INTERCEPT_PRIORITY):
@@ -426,22 +446,43 @@ class DDoSMitigator(app_manager.RyuApp):
             eth_src = stat.match.get("eth_src")
             if not eth_src or eth_src in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
                 continue
-            if stat.match.get("ip_proto") == 6:
-                continue    # TCP explícito -> excluir (ver NOTA_FLOWSTATS)
+            is_l4 = self._match_has_l4_fields(stat.match)
+            if is_l4:
+                skipped += 1
+                log.debug(
+                    "[DDoS-A] dpid=%-5d FILTRADA (L4): prio=%d pkts=%d match=%s",
+                    dpid, stat.priority, stat.packet_count, stat.match,
+                )
+                continue
+            counted += 1
             current[eth_src] += stat.packet_count
             ipv4_src = stat.match.get("ipv4_src")
             if ipv4_src and eth_src not in self._mac_to_ip:
                 self._mac_to_ip[eth_src] = ipv4_src
+
+        log.debug(
+            "[DDoS-A] dpid=%-5d FlowStats: %d reglas total, "
+            "%d contadas (L2), %d filtradas (L4/PRI), %d MACs",
+            dpid, total_rules, counted, skipped, len(current),
+        )
 
         for eth_src, pkt_total in current.items():
             key  = (dpid, eth_src)
             prev = self._prev_pkt.get(key)
             if prev is None:
                 self._prev_pkt[key] = pkt_total
+                log.debug(
+                    "[DDoS-A] dpid=%-5d eth=%s baseline=%d (primer muestreo)",
+                    dpid, eth_src, pkt_total,
+                )
                 continue
             delta = pkt_total - prev
             if delta < 0:
                 self._prev_pkt[key] = pkt_total
+                log.debug(
+                    "[DDoS-A] dpid=%-5d eth=%s delta=%d (counter reset)",
+                    dpid, eth_src, delta,
+                )
                 continue
             self._prev_pkt[key] = pkt_total
             if delta == 0:
@@ -449,11 +490,22 @@ class DDoSMitigator(app_manager.RyuApp):
 
             pps    = delta / POLL_INTERVAL
             src_ip = self._mac_to_ip.get(eth_src)
-            if not src_ip or src_ip in self._blocked or src_ip in IP_WHITELIST:
+            log.info(
+                "[DDoS-A] dpid=%-5d eth=%s ip=%s Δ=%d pps=%.0f "
+                "threshold=%.0f %s",
+                dpid, eth_src, src_ip or "???", delta, pps,
+                DDOS_THRESH_PPS,
+                "*** BLOQUEAR ***" if pps >= DDOS_THRESH_PPS else "",
+            )
+            if not src_ip:
+                log.warning(
+                    "[DDoS-A] dpid=%-5d eth=%s sin mapping IP — "
+                    "no se puede bloquear",
+                    dpid, eth_src,
+                )
                 continue
-
-            log.debug("[DDoS-A] dpid=%-5d ip=%-15s Δ=%-7d pps=%.0f",
-                      dpid, src_ip, delta, pps)
+            if src_ip in self._blocked or src_ip in IP_WHITELIST:
+                continue
 
             if pps >= DDOS_THRESH_PPS:
                 self._trigger_mitigation(
@@ -522,7 +574,7 @@ class DDoSMitigator(app_manager.RyuApp):
             )
 
             # Port Scan: independiente del estado SYN
-            self._update_port_scan(ctx, src_ip, dst_port, now, datapath.id)
+            self._update_port_scan(ctx, src_ip, dst_ip, dst_port, now, datapath.id)
 
             log.debug(
                 "[DDoS-B] SYN ip=%-15s state=%-15s count=%-4d http=%-3d ratio=%.2f",
@@ -717,11 +769,16 @@ class DDoSMitigator(app_manager.RyuApp):
     # Port Scan (independiente de la FSM SYN/HTTP)
     
 
-    def _update_port_scan(self, ctx: IpContext, src_ip: str, dst_port: int,
-                          now: float, dpid: int):
+    def _update_port_scan(self, ctx: IpContext, src_ip: str, dst_ip: str,
+                          dst_port: int, now: float, dpid: int):
         """
-        Detecta Port Scan: muchos puertos únicos en ventana temporal.
-        Opera sobre el IpContext compartido pero con ventana propia.
+        Detecta Port Scan / Subnet Scan: dos vectores de detección.
+
+        Vectores de detección (cualquiera activa el bloqueo):
+          1. Subnet scan: mismo puerto, muchas IPs destino únicas
+             Ej: nmap -sS -p 80 10.1.1.0/24 → 254 dst_ips en 5s
+          2. Port scan clásico: mismo host, muchos puertos únicos
+             Ej: nmap -sS -p 1-100 10.1.1.4 → 100 puertos en 5s
         """
         if ctx.state == IpState.BLOCKED:
             return
@@ -730,24 +787,41 @@ class DDoSMitigator(app_manager.RyuApp):
         if wstart is None or (now - wstart) > PORT_SCAN_WINDOW:
             if wstart is not None:
                 log.debug(
-                    "[DDoS-B] PortScan ventana reset ip=%s (%d puertos en %.1fs)",
-                    src_ip, len(ctx.portscan_ports), now - wstart,
+                    "[DDoS-B] PortScan ventana reset ip=%s "
+                    "(%d puertos, %d dst_ips en %.1fs)",
+                    src_ip, len(ctx.portscan_ports),
+                    len(ctx.portscan_dst_ips), now - wstart,
                 )
-            ctx.portscan_wstart = now
-            ctx.portscan_ports  = set()
+            ctx.portscan_wstart  = now
+            ctx.portscan_ports   = set()
+            ctx.portscan_dst_ips = set()
 
         ctx.portscan_ports.add(dst_port)
-        port_count = len(ctx.portscan_ports)
+        ctx.portscan_dst_ips.add(dst_ip)
+        port_count   = len(ctx.portscan_ports)
+        dst_ip_count = len(ctx.portscan_dst_ips)
 
         log.debug(
-            "[DDoS-B] PortScan ip=%-15s puertos=%-4d threshold=%d ventana=%.1fs",
-            src_ip, port_count, PORT_SCAN_THRESHOLD, now - ctx.portscan_wstart,
+            "[DDoS-B] PortScan ip=%-15s puertos=%-4d dst_ips=%-4d "
+            "threshold=%d ventana=%.1fs",
+            src_ip, port_count, dst_ip_count,
+            PORT_SCAN_THRESHOLD, now - ctx.portscan_wstart,
         )
 
-        if port_count >= PORT_SCAN_THRESHOLD:
+        # Subnet scan: muchas IPs destino en la misma ventana
+        if dst_ip_count >= PORT_SCAN_THRESHOLD:
             self._trigger_mitigation(
                 src_ip, "PORT_SCAN",
-                f"unique_ports={port_count} en {PORT_SCAN_WINDOW}s",
+                f"unique_dst_ips={dst_ip_count} en {PORT_SCAN_WINDOW}s "
+                f"(puertos={port_count})",
+                dpid,
+            )
+        # Port scan clásico: muchos puertos en un solo host
+        elif port_count >= PORT_SCAN_THRESHOLD:
+            self._trigger_mitigation(
+                src_ip, "PORT_SCAN",
+                f"unique_ports={port_count} en {PORT_SCAN_WINDOW}s "
+                f"(dst_ips={dst_ip_count})",
                 dpid,
             )
 
@@ -831,6 +905,21 @@ class DDoSMitigator(app_manager.RyuApp):
         if not any(payload.startswith(m) for m in HTTP_METHODS):
             return False
         return b"HTTP/" in payload or b"\r\n" in payload
+
+    @staticmethod
+    def _match_has_l4_fields(match) -> bool:
+        """
+        Detecta si un match de FlowStats contiene campos de capa 4.
+
+        Las reglas L2 de dc_switch (in_port, eth_src, eth_dst) NO contienen
+        campos L4 y su packet_count incluye todo el tráfico (TCP, UDP, etc).
+        Solo esas reglas deben contribuir al conteo volumétrico.
+
+        Las reglas L4 (con ip_proto, tcp_dst, udp_src, etc) representan
+        tráfico filtrado por protocolo y NO deben contarse como volumen.
+        """
+        match_str = str(match)
+        return any(f in match_str for f in _L4_MATCH_FIELDS)
 
     def _update_packetin_stats(self):
         """Monitor de tasa PacketIn. Alerta si supera PACKETIN_WARN_RATE."""
@@ -1069,6 +1158,8 @@ class DDoSMitigator(app_manager.RyuApp):
             "[DDoS]    Dist SYN Flood:       %d\n"
             "[DDoS]    Dist HTTP Flood:      %d\n"
             "[DDoS]  Estados activos:        %s\n"
+            "[DDoS]  FlowStats tracking:     %d MACs\n"
+            "[DDoS]  MAC->IP cache:          %d entradas\n"
             "[DDoS]  PacketIn totales:       %d\n"
             "[DDoS]  Switches:               %d -> %s\n"
             "[DDoS] ------------------------------------------------",
@@ -1081,6 +1172,8 @@ class DDoSMitigator(app_manager.RyuApp):
             s.get("distributed_syn_flood", 0),
             s.get("distributed_http_flood", 0),
             dict(state_counts),
+            len(self._prev_pkt),
+            len(self._mac_to_ip),
             s["packetin_total"],
             len(self._datapaths), sorted(self._datapaths.keys()),
         )

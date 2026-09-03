@@ -433,17 +433,18 @@ Cada POLL_INTERVAL segundos:
 └── Al recibir OFPFlowStatsReply:
     └── Para cada stat en body:
         │
-        ├── Ignorar: priority ∈ {BLOCK_PRIORITY, INTERCEPT_PRIORITY}
-        │   (nuestras propias reglas, no queremos contaminar el análisis)
-        │
-        ├── Ignorar: eth_src == broadcast o vacío
-        │
-        ├── Ignorar: ip_proto == 6 (TCP explícito en el match)
-        │   (TCP se analiza via PacketIn; las reglas de dc_switch con L2
-        │   match pueden incluir TCP, pero ip_proto no está en su match
-        │   → None ≠ 6, por lo que estas reglas SÍ se incluyen)
-        │
-        └── Acumular: current[eth_src] += stat.packet_count
+├── Ignorar: priority ∈ {BLOCK_PRIORITY, INTERCEPT_PRIORITY}
+│   (nuestras propias reglas, no queremos contaminar el análisis)
+│
+├── Ignorar: eth_src == broadcast o vacío
+│
+├── Ignorar: reglas con campos L4 (ip_proto, tcp_dst, udp_src, etc)
+│   (_match_has_l4_fields): solo las reglas L2 puras de dc_switch
+│   (match en in_port, eth_src, eth_dst sin campos de transporte)
+│   contribuyen al conteo volumétrico. Las reglas L4 representan
+│   tráfico filtrado por protocolo y NO deben contarse como volumen.
+│
+└── Acumular: current[eth_src] += stat.packet_count
 ```
 
 ### Cálculo de PPS
@@ -458,7 +459,7 @@ Si `POLL_INTERVAL = 2` segundos y en ese período se registraron 40.000 paquetes
 pps = 40000 / 2 = 20000 paquetes/segundo
 ```
 
-Si `pps ≥ DDOS_THRESH_PPS = 20000`:
+Si `pps ≥ DDOS_THRESH_PPS = 1000`:
 ```
 → VOLUMETRIC_FLOOD detectado
 ```
@@ -477,75 +478,108 @@ Los contadores del switch pueden resetearse si una regla de dc_switch expira por
 ### Nota sobre el filtro TCP en FlowStats
 
 ```python
-if stat.match.get("ip_proto") == 6:
-    continue
+if self._match_has_l4_fields(stat.match):
+    continue    # Excluir reglas L4 (TCP/UDP/ICMP) del conteo volumétrico
 ```
 
-Este filtro intenta excluir flujos TCP del análisis volumétrico. Sin embargo, `dc_switch.py` (SpineLeaf1) instala reglas con match(in_port, eth_src, eth_dst) **sin** ip_proto en el match. Para esas reglas, `stat.match.get("ip_proto")` devuelve `None`, y `None == 6` es False → las reglas L2 NO se excluyen.
+Este filtro usa `_match_has_l4_fields()` para detectar si el match contiene campos de capa 4 (`ip_proto`, `tcp_dst`, `udp_src`, etc). Solo las reglas L2 puras de dc_switch (match en `in_port`, `eth_src`, `eth_dst` sin campos de transporte) contribuyen al conteo volumétrico.
 
-En la práctica, esto significa que el FlowStats volumétrico puede incluir tráfico TCP en su conteo. Sin embargo, esto no es un problema operacional porque:
-1. Los SYN floods son detectados por PacketIn en <2 segundos, mucho antes de que FlowStats acumule suficiente delta.
-2. Si un SYN flood también dispara el detector FlowStats, `self._blocked` previene la instalación duplicada de reglas DROP.
-3. El threshold `DDOS_THRESH_PPS = 20000` está calibrado por encima del tráfico TCP legítimo normal en el laboratorio.
+Esto garantiza que:
+1. El tráfico TCP de iperf NO se cuenta como volumen → iperf no es bloqueado falsamente.
+2. Solo el tráfico UDP/ICMP bruto (sin filtros L4) activa el detector volumétrico.
+3. Los SYN floods siguen siendo detectados por PacketIn en <2 segundos.
 
 ---
 
-## 7. Detección de Port Scan
+## 7. Detección de Port Scan / Subnet Scan
 
 ### ¿Qué es un Port Scan?
 
 Un port scan es una técnica de reconocimiento donde el atacante sondea un host para determinar qué puertos tienen servicios escuchando. La variante más común es el **SYN scan** (half-open scan): se envía un SYN a cada puerto, y si el puerto está abierto, el servidor responde con SYN-ACK. El scanner envía un RST sin completar el handshake, dejando el puerto en estado "entrevistado" sin establecer una conexión completa.
 
-### Señal Diferenciadora
+### Dos Vectores de Detección
 
-La diferencia clave entre un port scan y un SYN flood hacia un único puerto es la **diversidad de puertos destino**:
+El detector ahora opera con **dos vectores independientes**, activados por cualquiera de los dos:
+
+#### Vector 1: Subnet Scan (muchas IPs destino)
+
+Cuando un atacante escanea una subred entera en el mismo puerto:
 
 ```
-SYN flood: 10.000 SYN/s todos al puerto 80
-  → ctx.portscan_ports = {80}
-  → len(set) = 1 → nunca dispara port scan
+nmap -sS -p 80 10.1.1.0/24:
+  → SYN a 10.1.1.1:80, 10.1.1.2:80, ... 10.1.1.254:80
+  → ctx.portscan_dst_ips = {10.1.1.1, 10.1.1.2, ..., 10.1.1.254}
+  → len(set) = 254 ≥ PORT_SCAN_THRESHOLD=20 → PORT_SCAN detectado
+```
 
-nmap -sS -p 1-100:
+#### Vector 2: Port Scan Clásico (muchos puertos en un host)
+
+Cuando un atacante escanea muchos puertos en un solo host:
+
+```
+nmap -sS -p 1-100 10.1.1.4:
   → SYN al puerto 1, SYN al puerto 2, ... SYN al puerto 100
   → ctx.portscan_ports = {1, 2, 3, ..., 100}
-  → len(set) = 100 ≥ PORT_SCAN_THRESHOLD → PORT_SCAN detectado
+  → len(set) = 100 ≥ PORT_SCAN_THRESHOLD=20 → PORT_SCAN detectado
+```
+
+### Señal Diferenciadora
+
+La diferencia clave entre un port scan y un SYN flood hacia un único puerto es la **diversidad de puertos destino o IPs destino**:
+
+```
+SYN flood: 10.000 SYN/s todos al puerto 80 de un host
+  → ctx.portscan_ports = {80}, ctx.portscan_dst_ips = {target}
+  → ambos = 1 → nunca dispara port scan
+
+Port scan: SYN a puertos 1-100 en un host
+  → ctx.portscan_ports = {1, 2, ..., 100}, ctx.portscan_dst_ips = {target}
+  → port_count=100 ≥ threshold → DETECTADO
+
+Subnet scan: SYN a puerto 80 en 254 hosts
+  → ctx.portscan_ports = {80}, ctx.portscan_dst_ips = {254 IPs}
+  → dst_ip_count=254 ≥ threshold → DETECTADO
 ```
 
 ### Implementación
 
 ```python
-def _update_port_scan(self, ctx: IpContext, src_ip: str, dst_port: int,
-                      now: float, dpid: int):
+def _update_port_scan(self, ctx, src_ip, dst_ip, dst_port, now, dpid):
     # Ventana temporal: resetear si expiró PORT_SCAN_WINDOW segundos
     wstart = ctx.portscan_wstart
     if wstart is None or (now - wstart) > PORT_SCAN_WINDOW:
-        ctx.portscan_wstart = now
-        ctx.portscan_ports  = set()       # resetear set de puertos
+        ctx.portscan_wstart  = now
+        ctx.portscan_ports   = set()   # resetear set de puertos
+        ctx.portscan_dst_ips = set()   # resetear set de IPs destino
 
-    ctx.portscan_ports.add(dst_port)      # añadir puerto actual (set: sin duplicados)
-    port_count = len(ctx.portscan_ports)
+    ctx.portscan_ports.add(dst_port)
+    ctx.portscan_dst_ips.add(dst_ip)
 
-    if port_count >= PORT_SCAN_THRESHOLD:
+    # Vector 1: Subnet scan (muchas IPs destino)
+    if len(ctx.portscan_dst_ips) >= PORT_SCAN_THRESHOLD:
+        self._trigger_mitigation(src_ip, "PORT_SCAN", ...)
+    # Vector 2: Port scan clásico (muchos puertos)
+    elif len(ctx.portscan_ports) >= PORT_SCAN_THRESHOLD:
         self._trigger_mitigation(src_ip, "PORT_SCAN", ...)
 ```
 
-El uso de un `set()` es esencial: si la IP envía 1.000 SYN al puerto 80, `ctx.portscan_ports` sigue siendo `{80}` con size=1. Solo los puertos únicos cuentan.
+El uso de `set()` es esencial: si la IP envía 1.000 SYN al puerto 80, `ctx.portscan_ports` sigue siendo `{80}` con size=1. Solo los puertos únicos cuentan. De forma similar, `portscan_dst_ips` cuenta IPs destino únicas.
 
 ### Ventana Temporal
 
-`PORT_SCAN_WINDOW = 10` segundos es el período de observación. Si una IP contacta 20 puertos distintos en 10 segundos → PORT_SCAN. Si tarda 11 segundos (1 puerto/segundo), la ventana se resetea y el set vuelve a size=0.
+`PORT_SCAN_WINDOW = 5` segundos es el período de observación. Si una IP contacta 20 puertos o IPs distintas en 5 segundos → PORT_SCAN. Si tarda más, la ventana se resetea y los sets vuelven a size=0.
 
-Esta es una limitación conocida: **slow scans** (`nmap --scan-delay 2s`) con PORT_SCAN_THRESHOLD=20 y PORT_SCAN_WINDOW=10 no son detectados. Es un trade-off aceptado en el diseño: detectar scans rápidos con alta certeza vs. tolerar scans lentos.
+Esta es una limitación conocida: **slow scans** (`nmap --scan-delay 2s`) con PORT_SCAN_THRESHOLD=20 y PORT_SCAN_WINDOW=5 no son detectados. Es un trade-off aceptado en el diseño: detectar scans rápidos con alta certeza vs. tolerar scans lentos.
 
 ### Independencia del Port Scan respecto a la FSM SYN/HTTP
 
-El detector de port scan opera **sobre todos los SYN**, independientemente del estado FSM de la IP. Incluso si la IP está en `HTTP_CANDIDATE` (porque también envía requests HTTP), si contacta suficientes puertos distintos, se detecta el port scan.
+El detector de port scan opera **sobre todos los SYN**, independientemente del estado FSM de la IP. Incluso si la IP está en `HTTP_CANDIDATE` (porque también envía requests HTTP), si contacta suficientes puertos o IPs distintas, se detecta el port scan.
 
 ```python
 if is_syn:
     syn_count = ctx.slide_syn(now)
-    self._update_port_scan(ctx, src_ip, dst_port, now, datapath.id)  # siempre
-    self._evaluate_syn(ctx, src_ip, syn_count, now, datapath.id)     # FSM
+    self._update_port_scan(ctx, src_ip, dst_ip, dst_port, now, datapath.id)  # siempre
+    self._evaluate_syn(ctx, src_ip, syn_count, now, datapath.id)             # FSM
 ```
 
 Esto permite detectar un atacante que combina port scan con HTTP flood, clasificándolo como PORT_SCAN (la primera detección que actúa).
@@ -561,7 +595,8 @@ Esto permite detectar un atacante que combina port scan con HTTP flood, clasific
 | Browser cargando web (10-20 SYN/s) | Bajo | Threshold=100 >> 20 |
 | ab sin keep-alive (`-c 50`) | Medio | FSM: SYN_CANDIDATE + gracia HTTP |
 | ab con keep-alive (`-k -c 200`) | Bajo | Pocos SYN; detector HTTP por req count |
-| iperf3 TCP (muchos paquetes) | Medio | FlowStats threshold alto (20000 pps) |
+| iperf3 TCP (muchos paquetes) | Bajo | FlowStats excluye reglas L4 del conteo |
+| iperf3 TCP (1 dst_ip, 1 puerto) | Bajo | Port scan: 1 dst_ip << threshold=20 |
 | Servidor con muchas conexiones | Bajo | IP_WHITELIST configurable |
 | Scan de seguridad interno | Bajo | IP_WHITELIST para herramientas internas |
 
@@ -612,6 +647,7 @@ class IpContext:
         "syn_candidate_ts", # float: cuándo entró a SYN_CANDIDATE
         "http_ts",          # deque: timestamps de HTTP recientes
         "portscan_ports",   # set: puertos únicos contactados
+        "portscan_dst_ips", # set: IPs destino únicas (subnet scan detection)
         "portscan_wstart",  # float: inicio de ventana port scan
         "last_seen",        # float: último timestamp de actividad
     )

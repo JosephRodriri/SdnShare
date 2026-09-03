@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import time
 
-# Un solo proceso hping3 puede no llegar a 20000 pps en un entorno Docker.
+# Un solo proceso hping3 puede no llegar a 1000 pps en un entorno Docker.
 # Los procesos comparten IP/MAC, por lo que FlowStats agrega su tráfico en el
 # mismo contador y el mitigador evalúa la tasa total de la fuente.
 FLOOD_PROCESSES = 4
@@ -18,7 +18,7 @@ print(f"\n[UDPFlood] h2 -> {TARGET}")
 
 print(
     f"[UDPFlood] Lanzando {FLOOD_PROCESSES} UDP floods "
-    "(>20000 pps agregados esperado)..."
+    "(>1000 pps agregados esperado)..."
 )
 blocked = False
 

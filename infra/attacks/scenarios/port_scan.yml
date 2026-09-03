@@ -1,6 +1,6 @@
-# Port Scan
+# Port Scan / Subnet Scan
 name: port_scan
-description: "Escaneo de puertos TCP contra un host objetivo"
+description: "Escaneo de puertos TCP / subnet scan contra la red"
 label: ATTACK
 
 target:
@@ -12,9 +12,11 @@ attackers:
 
 tool: nmap
 params:
-  # 20 puertos únicos deben llegar en PORT_SCAN_WINDOW=5 s.
-  flags: "-Pn -n -sS --min-rate 100 -p 1-100"
+  # Detección por IPs destino únicas: 20+ IPs en PORT_SCAN_WINDOW=5 s.
+  # Subnet scan: mismo puerto, muchas IPs → se detecta por portscan_dst_ips
+  flags: "-Pn -n -sS --min-rate 100 -p 80"
   duration_seconds: 10
 
 # Uso manual en Mininet CLI:
-# h1 nmap -Pn -n -sS --min-rate 100 -p 1-100 10.1.1.4
+# h1 nmap -Pn -n -sS --min-rate 100 -p 80 10.1.1.0/24    # Subnet scan
+# h1 nmap -Pn -n -sS --min-rate 100 -p 1-100 10.1.1.4     # Port scan clásico

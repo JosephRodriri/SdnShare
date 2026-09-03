@@ -1,6 +1,6 @@
 # DDoS UDP Flood
 name: ddos_udp_flood
-description: "Ataque DDoS UDP volumétrico: cada atacante debe superar 20000 pps"
+description: "Ataque DDoS UDP volumétrico: cada atacante debe superar 1000 pps"
 label: ATTACK
 
 target:

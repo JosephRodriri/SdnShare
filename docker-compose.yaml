@@ -12,7 +12,7 @@ services:
       - MITIGATION_EVENTS_FILE=/data/mitigation_events.jsonl
       - PROMETHEUS_POLLTIME=${PROMETHEUS_POLLTIME:-30}
       
-      - DDOS_THRESH_PPS=20000   # Umbral de paquetes por segundo para detectar DDoS
+      - DDOS_THRESH_PPS=1000   # Umbral de paquetes por segundo para detectar DDoS
       - DDOS_INTERVAL=2       # Intervalo de poll FlowStats (segundos)
       - DDOS_BLOCK_TIMEOUT=120 # Segundos hasta que expira el bloqueo automáticament
       - PORT_SCAN_THRESHOLD=20

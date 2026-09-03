@@ -74,12 +74,12 @@ Ejemplo:
 
 ```yaml
 environment:
-  - DDOS_THRESH_PPS=20000
+  - DDOS_THRESH_PPS=1000
   - DDOS_INTERVAL=2
   - DDOS_BLOCK_TIMEOUT=120
-  - PORT_SCAN_THRESHOLD=10
-  - PORT_SCAN_WINDOW=10
-  - HTTP_FLOOD_THRESHOLD=15
+  - PORT_SCAN_THRESHOLD=20
+  - PORT_SCAN_WINDOW=5
+  - HTTP_FLOOD_THRESHOLD=10
   - HTTP_PORTS=80,443
 ```
 
@@ -97,7 +97,7 @@ Detectar ataques volumétricos de alto tráfico UDP o ICMP utilizando estadísti
 
 | Variable             | Valor  | Descripción                    |
 | -------------------- | ------ | ------------------------------ |
-| `DDOS_THRESH_PPS`    | `20000` | Umbral de paquetes por segundo |
+| `DDOS_THRESH_PPS`    | `1000`  | Umbral de paquetes por segundo |
 | `DDOS_INTERVAL`      | `2s`   | Intervalo de polling FlowStats |
 | `DDOS_BLOCK_TIMEOUT` | `120s` | Tiempo de bloqueo              |
 
@@ -126,14 +126,15 @@ PPS = \frac{\Delta paquetes}{\Delta tiempo}
 
 ## Justificación del Threshold
 
-El valor `20000 PPS` fue seleccionado porque:
+El valor `1000 PPS` fue seleccionado porque:
 
 * tráfico normal del laboratorio:
 
   * ~10–200 PPS
 * flood UDP/ICMP:
 
-  * > 20000 PPS con varios procesos `hping3 --flood` por atacante
+  * hping3 --flood en Mininet Docker: ~200-3000 PPS por proceso
+  * 4 procesos: ~800-12000 PPS
 * minimiza falsos positivos
 
 ---
@@ -343,33 +344,34 @@ El threshold de `10 req/s` permite detectar fácilmente floods controlados.
 
 ---
 
-# 4. Detección de Port Scan
+# 4. Detección de Port Scan / Subnet Scan
 
 ## Objetivo
 
-Detectar exploración masiva de puertos TCP.
+Detectar exploración masiva de puertos TCP y escaneo de subredes.
 
 ---
 
 ## Parámetros
 
-| Variable              | Valor        |
-| --------------------- | ------------ |
-| `PORT_SCAN_THRESHOLD` | `10 puertos` |
-| `PORT_SCAN_WINDOW`    | `10s`        |
+| Variable              | Valor                      |
+| --------------------- | -------------------------- |
+| `PORT_SCAN_THRESHOLD` | `20 puertos o dst_ips`     |
+| `PORT_SCAN_WINDOW`    | `5s`                       |
 
 ---
 
 ## Funcionamiento
 
-Para cada IP:
+El detector opera con **dos vectores** (cualquiera activa el bloqueo):
 
-* se almacenan puertos únicos contactados
-* dentro de una ventana temporal
+### Vector 1: Subnet Scan
+
+Para cada IP origen, se almacenan las IPs destino únicas contactadas:
 
 Si:
 
-Puertos_{unicos} \geq 10
+DstIPs_{unicas} \geq 20
 
 entonces:
 
@@ -377,19 +379,44 @@ entonces:
 BLOCKED(PORT_SCAN)
 ```
 
+Ejemplo:
+
+```bash
+nmap -sS -p 80 10.1.1.0/24
+```
+
+Contacta 254 IPs en la misma ventana → supera threshold.
+
+### Vector 2: Port Scan Clásico
+
+Para cada IP origen, se almacenan los puertos destino únicos contactados:
+
+Si:
+
+Puertos_{unicos} \geq 20
+
+entonces:
+
+```text
+BLOCKED(PORT_SCAN)
+```
+
+Ejemplo:
+
+```bash
+nmap -sS -p 1-100 10.1.1.4
+```
+
+Contacta 100 puertos únicos → supera threshold.
+
 ---
 
 ## Justificación
 
-Escaneos con:
-
-```bash
-nmap -sS -p 1-100
-```
-
-superan rápidamente este threshold.
-
-El tráfico normal rara vez accede a tantos puertos distintos en pocos segundos.
+* Subnet scan: escaneos como `nmap -sS 10.1.1.0/24` contactan 254 IPs en segundos.
+* Port scan clásico: `nmap -sS -p 1-100` contacta 100 puertos en un host.
+* El tráfico normal (iperf, web browsing) contacta 1-5 IPs/puertos distintos.
+* SYN flood a un puerto: solo 1 IP destino y 1 puerto → nunca activa el detector.
 
 ---
 
@@ -450,10 +477,18 @@ wrk -t4 -c10 -d10s http://TARGET/
 
 ---
 
-## Port Scan
+## Port Scan (clásico)
 
 ```bash
 nmap -sS -p 1-100 TARGET
+```
+
+---
+
+## Subnet Scan
+
+```bash
+nmap -sS -p 80 10.1.1.0/24
 ```
 
 ---
