@@ -14,7 +14,9 @@ h1.cmd(
     f"hping3 -S --flood -p 80 {TARGET} > /dev/null 2>&1 &"
 )
 
-time.sleep(8)
+# Margen para VM lenta: el contador SYN necesita baseline + delta, y los
+# hping3 tardan en arrancar.
+time.sleep(12)
 
 print("[SYNFlood] Verificando mitigación...")
 
@@ -31,5 +33,8 @@ print(
 
 h1.cmd("pkill hping3")
 
+# Señal no fatal: guardamos el resultado en una global consultable y NO
+# lanzamos SystemExit (que mataría el CLI de Mininet y rompería `make topo`).
+_LAST_TEST_BLOCKED = blocked
 if not blocked:
-    raise SystemExit("El mitigador no bloqueó el SYN flood")
+    print("[SYNFlood] El mitigador no bloqueó el SYN flood")

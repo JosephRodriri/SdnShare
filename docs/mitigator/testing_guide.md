@@ -101,9 +101,9 @@ docker-compose.yaml
 Current configuration:
 
 ```yaml
-- DDOS_THRESH_PPS=20000
+- DDOS_THRESH_PPS=1000
 - DDOS_INTERVAL=2
-- DDOS_BLOCK_TIMEOUT=120
+- DDOS_BLOCK_TIMEOUT=25
 
 - PORT_SCAN_THRESHOLD=20
 - PORT_SCAN_WINDOW=5
@@ -523,7 +523,7 @@ BLOCK_IDLE_TIMEOUT
 Default:
 
 ```python
-120 seconds
+25 seconds
 ```
 
 When expiration occurs:
@@ -533,6 +533,13 @@ EventOFPFlowRemoved
 ```
 
 cleans the internal IP state.
+
+> **Nota para pruebas en secuencia:** cada host atacante queda bloqueado
+> `BLOCK_IDLE_TIMEOUT` (25 s) tras detectarse un ataque. Si reutilizas el
+> mismo host (p. ej. `test_syn_flood.py` usa `h1` y después `test_port_scan.py`
+> también usa `h1`) dentro de esa ventana, sus paquetes se descartan en el
+> switch y el siguiente ataque no se detecta. Espera ~25 s o usa un host
+> distinto para cada test.
 
 ---
 

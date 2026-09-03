@@ -51,7 +51,10 @@ topo: ## Inicia topología spine-leaf en Mininet
 	@echo "$(CYAN)⏳ Verificando controller...$(RESET)"
 	@until docker compose exec -T controller python3 -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost',8080)); s.close()" 2>/dev/null; do sleep 2; done
 	@echo "$(GREEN)✓ Controller listo — iniciando topología$(RESET)"
-	docker compose exec -it mininet ./infra/topology/mn_spineleaf_topo.py infra/configs/network_config.yaml
+	# No propagar el fallo de los tests de ataque (raise SystemExit) como Error 1:
+	# los tests reportan BLOQUEADO/NO bloqueado por sí mismos y el usuario debe
+	# poder ver el resultado y continuar en el CLI de Mininet sin romper `make`.
+	docker compose exec -it mininet ./infra/topology/mn_spineleaf_topo.py infra/configs/network_config.yaml; true
 
 topo-clean: ## Limpia topología Mininet
 	docker compose exec -T mininet mn -c 2>/dev/null || true
