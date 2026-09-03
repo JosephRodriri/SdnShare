@@ -21,7 +21,7 @@ from ryu.lib.packet import ethernet, ether_types, ipv4, packet, tcp
 from ryu.ofproto import ofproto_v1_3
 
 log = logging.getLogger("ddos_mitigator")
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 # JSON Lines is deliberately used so events can be appended safely while the
 # controller runs and later copied into the directory of a specific run.
@@ -89,9 +89,25 @@ VICTIM_ALERT_COOLDOWN = float(os.environ.get("VICTIM_ALERT_COOLDOWN", 2.0))
 # ── OpenFlow priorities 
 BLOCK_PRIORITY     = 1000
 INTERCEPT_PRIORITY = 500
+# SYN hacia puertos HTTP se cuenta en el switch (NO viaja al controller):
+# elimina la tormenta de packet-in de un SYN flood dirigido a puertos HTTP
+# y permite detectar el flood volumétricamente via FlowStats. Debe estar
+# POR ENCIMA de la inspección HTTP para que un SYN a puerto HTTP no llegue
+# al controller (la conexión de control se congestiona y retrasa las
+# respuestas FlowStats ~47s, haciendo que un flood UDP posterior pase
+# desapercibido).
+SYN_HTTP_COUNT_PRIORITY = INTERCEPT_PRIORITY + 10
+# SYN hacia puertos NO HTTP sigue yendo al controller (poco volumen) para
+# alimentar la detección de port scan sin generar tormenta.
+SYN_OTHER_PRIORITY   = 400
 # SYN debe tener prioridad sobre la inspección HTTP: un SYN dirigido a un
 # puerto HTTP sigue alimentando el detector de SYN/port scan.
 HTTP_INTERCEPT_PRIORITY = INTERCEPT_PRIORITY - 1
+# Reglas de metering: contar solo UDP/ICMP en table 0, por debajo de intercept.
+METERING_PRIORITY  = 200
+# Prioridad por encima de metering para excluir puertos UDP "confiables"
+# (ej. iperf 5001) del conteo volumétrico: enrutan a forwarding sin contar.
+METERING_EXCLUDE_PRIORITY = 210
 POLICY_TABLE       = 0
 FORWARD_TABLE      = 1
 BLOCK_TABLE        = POLICY_TABLE
@@ -108,13 +124,22 @@ HTTP_METHODS = (
     b"DELETE ", b"PATCH ", b"OPTIONS ", b"CONNECT ", b"TRACE ",
 )
 
-# ── Campos L4 en match de FlowStats para excluir del conteo volumétrico 
-# Reglas con estos campos representan tráfico TCP/UDP/ICMP y no deben
-# contarse como volumen bruto (FlowStats solo detecta UDP/ICMP flood).
-_L4_MATCH_FIELDS = frozenset({
-    "ip_proto", "tcp_src", "tcp_dst", "udp_src", "udp_dst",
-    "icmpv4_type", "icmpv4_code", "tcp_flags",
+# ── Campos TCP en match de FlowStats para excluir del conteo volumétrico 
+# Reglas con campos TCP representan tráfico interceptado (SYN/HTTP) y no
+# deben contarse como volumen bruto. Las reglas de metering (solo ip_proto)
+# SÍ se cuentan para detectar UDP/ICMP flood.
+_TCP_MATCH_FIELDS = frozenset({
+    "tcp_src", "tcp_dst", "tcp_flags",
 })
+# Protocolos que FlowStats monitorea para volumetric flood
+_METERING_PROTOCOLS = {17, 1}  # UDP=17, ICMP=1
+# Puertos UDP excluidos del conteo volumétrico (tráfico legítimo confiable,
+# ej. iperf usa 5001). Se enrutan a forwarding sin contarse.
+IPERF_EXCLUDE_PORTS = {
+    int(p.strip())
+    for p in os.environ.get("DDOS_UDP_EXCLUDE_PORTS", "5001").split(",")
+    if p.strip()
+}
 
 
 
@@ -239,6 +264,11 @@ class DDoSMitigator(app_manager.RyuApp):
         self._datapaths: dict = {}
         self._leaf_dpids: set = self._load_leaf_dpids()
 
+        # ── Puertos de host por switch: {dpid: {in_port: (mac, ip)}} 
+        # Solo los puertos donde un host se conecta directamente reciben reglas
+        # de metering. Esto evita doble conteo en puertos de tránsito (uplink).
+        self._host_ports: dict = self._load_host_ports()
+
         # ── Estado de IPs bloqueadas (compatibilidad con _trigger_mitigation) 
         self._blocked: set = set()
         self._blocked_dpids: dict = {}
@@ -248,8 +278,12 @@ class DDoSMitigator(app_manager.RyuApp):
         # { src_ip -> IpContext }
         self._ip_ctx: dict = {}
 
+        # ── FlowStats: mapeo in_port → host se obtiene de forma estática 
+        # vía self._host_ports (config) en el handler, no de learning.
+
         # ── FlowStats (heredado, sin cambios) 
         self._prev_pkt: dict  = {}
+        self._prev_syn_pkt: dict = {}
         self._mac_to_ip: dict = {}
         self._victim_syn: dict = defaultdict(deque)
         self._victim_http: dict = defaultdict(deque)
@@ -330,6 +364,53 @@ class DDoSMitigator(app_manager.RyuApp):
     def _is_leaf_datapath(self, dpid: int) -> bool:
         return not self._leaf_dpids or dpid in self._leaf_dpids
 
+    @staticmethod
+    def _load_host_ports() -> dict:
+        """
+        Carga {dpid: {in_port: (mac, ip)}} desde el config de red.
+
+        Identifica los puertos donde cada host se conecta directamente a un
+        leaf, para que las reglas de metering solo cuenten el tráfico de
+        hosts reales (no el de tránsito por puertos de uplink).
+        """
+        config_file = os.environ.get("NETWORK_CONFIG_FILE", "network_config.yaml")
+        try:
+            with open(config_file, "r", encoding="utf-8") as fh:
+                config = yaml.safe_load(fh) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            log.warning(
+                "[DDoS] No se pudo leer NETWORK_CONFIG_FILE=%s para "
+                "puertos de host (%s); metering por puertos conocidos",
+                config_file, exc,
+            )
+            return {}
+
+        switch_mapping = {
+            str(sw["name"]): int(sw["id"])
+            for sw in config.get("switches", [])
+            if "name" in sw and "id" in sw
+        }
+        host_ports: dict = {}
+        for host in config.get("hosts", []):
+            sw_name = host.get("connected_to")
+            if sw_name not in switch_mapping:
+                continue
+            dpid = switch_mapping[sw_name]
+            port = host.get("port")
+            mac  = host.get("mac")
+            ip   = host.get("ip")
+            if port is None or not mac:
+                continue
+            host_ports.setdefault(dpid, {})[int(port)] = (mac, ip)
+        return host_ports
+
+    def _host_mac_by_port(self, dpid: int, in_port: int):
+        """Devuelve (mac, ip) del host conectado a (dpid, in_port), o (None, None)."""
+        entry = self._host_ports.get(dpid, {}).get(in_port)
+        if not entry:
+            return None, None
+        return entry[0], entry[1]
+
     
     # REGISTRO DE SWITCHES
     
@@ -351,25 +432,6 @@ class DDoSMitigator(app_manager.RyuApp):
         hub.sleep(0.2)
         ofproto = dp.ofproto
         parser  = dp.ofproto_parser
-
-        # ── Regla SYN: tcp_flags=(0x002, 0x012) -> SYN=1, ACK=0 
-        syn_act  = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, SYN_MAXLEN)]
-        syn_inst = [
-            parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, syn_act),
-            parser.OFPInstructionWriteMetadata(INSPECTED_METADATA,
-                                               INSPECTED_METADATA_MASK),
-            parser.OFPInstructionGotoTable(FORWARD_TABLE),
-        ]
-        match_syn = parser.OFPMatch(
-            eth_type=ether_types.ETH_TYPE_IP,
-            ip_proto=6,
-            tcp_flags=(0x002, 0x012),   # SYN puro, no SYN-ACK
-        )
-        dp.send_msg(parser.OFPFlowMod(
-            datapath=dp, table_id=BLOCK_TABLE,
-            priority=INTERCEPT_PRIORITY, idle_timeout=0, hard_timeout=0,
-            match=match_syn, instructions=syn_inst, command=ofproto.OFPFC_ADD,
-        ))
 
         # ── Reglas HTTP: inspeccionar TCP hacia los puertos HTTP.
         # No se depende de PSH: ese flag es una sugerencia del stack TCP y
@@ -397,10 +459,102 @@ class DDoSMitigator(app_manager.RyuApp):
             ))
 
         log.info(
-            "[DDoS] dpid=%-5d -> SYN trap(prio=%d,max=%d) "
-            "HTTP TCP×%d(prio=%d,max=full) instaladas",
-            dp.id, INTERCEPT_PRIORITY, SYN_MAXLEN,
-            len(HTTP_PORTS), HTTP_INTERCEPT_PRIORITY, HTTP_MAXLEN,
+            "[DDoS] dpid=%-5d -> SYN count(prio=%d HTTP×%d) "
+            "SYN other->ctrl(prio=%d) HTTP TCP×%d(prio=%d,max=full) instaladas",
+            dp.id, SYN_HTTP_COUNT_PRIORITY, len(HTTP_PORTS),
+            SYN_OTHER_PRIORITY, len(HTTP_PORTS), HTTP_INTERCEPT_PRIORITY,
+        )
+
+        # ── Reglas de metering: contar solo UDP/ICMP de hosts directamente 
+        # conectados. Se instalan SOLO en los puertos de host (no uplinks) para
+        # evitar doble conteo de tráfico de tránsito. Matchean
+        # (eth_type, ip_proto, in_port) y hacen goto_table(FORWARD_TABLE).
+        # FlowStats contará únicamente estas reglas (prio=200).
+        # Los puertos UDP "confiables" (iperf 5001) se enrutan con prioridad
+        # MAYOR (METERING_EXCLUDE_PRIORITY) al forwarding SIN contarse.
+        metered_ports = []
+        host_ports = self._host_ports.get(dp.id, {})
+        for port_no in host_ports:
+            if port_no in (ofproto.OFPP_CONTROLLER, ofproto.OFPP_LOCAL,
+                           ofproto.OFPP_ANY, ofproto.OFPP_ALL):
+                continue
+            # ── Reglas SYN por puerto de host (reemplazan la regla SYN global)
+            # 1) SYN hacia puertos HTTP se CONTABILIZA en el switch (goto
+            #    FORWARD, sin enviar al controller). Elimina la tormenta de
+            #    packet-in del SYN flood dirigido a puertos HTTP y permite
+            #    detectar el flood volumétricamente via FlowStats.
+            for hp in sorted(HTTP_PORTS):
+                m_syn_http = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ip_proto=6,
+                    tcp_flags=(0x002, 0x012),   # SYN puro, no SYN-ACK
+                    tcp_dst=hp,
+                    in_port=port_no,
+                )
+                i_syn_http = [parser.OFPInstructionGotoTable(FORWARD_TABLE)]
+                dp.send_msg(parser.OFPFlowMod(
+                    datapath=dp, table_id=POLICY_TABLE,
+                    priority=SYN_HTTP_COUNT_PRIORITY, idle_timeout=0,
+                    hard_timeout=0, match=m_syn_http, instructions=i_syn_http,
+                    command=ofproto.OFPFC_ADD,
+                ))
+            # 2) SYN hacia puertos NO HTTP viaja al controller (bajo volumen)
+            #    para alimentar la detección de port scan.
+            syn_other_act = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                                    SYN_MAXLEN)]
+            syn_other_inst = [
+                parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+                                             syn_other_act),
+                parser.OFPInstructionWriteMetadata(INSPECTED_METADATA,
+                                                   INSPECTED_METADATA_MASK),
+                parser.OFPInstructionGotoTable(FORWARD_TABLE),
+            ]
+            dp.send_msg(parser.OFPFlowMod(
+                datapath=dp, table_id=POLICY_TABLE,
+                priority=SYN_OTHER_PRIORITY, idle_timeout=0, hard_timeout=0,
+                match=parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ip_proto=6,
+                    tcp_flags=(0x002, 0x012),
+                    in_port=port_no,
+                ),
+                instructions=syn_other_inst, command=ofproto.OFPFC_ADD,
+            ))
+            # Excluir puertos UDP confiables (mayor prioridad, sin conteo)
+            for dst_port in IPERF_EXCLUDE_PORTS:
+                match_excl = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ip_proto=17,
+                    in_port=port_no,
+                    udp_dst=dst_port,
+                )
+                inst_excl = [parser.OFPInstructionGotoTable(FORWARD_TABLE)]
+                dp.send_msg(parser.OFPFlowMod(
+                    datapath=dp, table_id=POLICY_TABLE,
+                    priority=METERING_EXCLUDE_PRIORITY, idle_timeout=0,
+                    hard_timeout=0, match=match_excl, instructions=inst_excl,
+                    command=ofproto.OFPFC_ADD,
+                ))
+            # Reglas de conteo volumétrico
+            for proto in _METERING_PROTOCOLS:
+                match = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ip_proto=proto,
+                    in_port=port_no,
+                )
+                inst = [parser.OFPInstructionGotoTable(FORWARD_TABLE)]
+                dp.send_msg(parser.OFPFlowMod(
+                    datapath=dp, table_id=POLICY_TABLE,
+                    priority=METERING_PRIORITY, idle_timeout=0, hard_timeout=0,
+                    match=match, instructions=inst, command=ofproto.OFPFC_ADD,
+                ))
+            metered_ports.append(port_no)
+
+        log.info(
+            "[DDoS] dpid=%-5d -> metering UDP/ICMP×%d host_ports=%s(prio=%d) "
+            "excl=%s(prio=%d) instaladas",
+            dp.id, len(metered_ports), metered_ports, METERING_PRIORITY,
+            sorted(IPERF_EXCLUDE_PORTS), METERING_EXCLUDE_PRIORITY,
         )
 
     
@@ -410,6 +564,7 @@ class DDoSMitigator(app_manager.RyuApp):
     def _poll_loop(self):
         hub.sleep(POLL_INTERVAL * 3)
         log.info("[DDoS-A] Polling loop iniciado (intervalo=%ds)", POLL_INTERVAL)
+        last = time.monotonic()
         while True:
             if not self._datapaths:
                 log.debug("[DDoS-A] Polling: sin datapaths registrados")
@@ -418,6 +573,9 @@ class DDoSMitigator(app_manager.RyuApp):
                     self._request_flow_stats(dp)
                 log.debug("[DDoS-A] Polling: stats solicitados a %d switches",
                           len(self._datapaths))
+            now = time.monotonic()
+            log.debug("[DDoS-A] Poll tick: intervalo=%.1fs", now - last)
+            last = now
             hub.sleep(POLL_INTERVAL)
 
     def _request_flow_stats(self, datapath):
@@ -440,30 +598,60 @@ class DDoSMitigator(app_manager.RyuApp):
         counted = 0
         total_rules = len(body)
 
+        # ── Contar SOLO reglas de metering (ip_proto sin campos TCP) 
+        # Las reglas de metering (prio=200) matchean (eth_type, ip_proto, in_port)
+        # y se instalan SOLO en puertos de host. Mapeamos in_port → eth_src de
+        # forma estática desde el config (no hay doble conteo de tránsito).
         for stat in body:
-            if stat.priority in (BLOCK_PRIORITY, INTERCEPT_PRIORITY):
+            if stat.priority != METERING_PRIORITY:
                 continue
-            eth_src = stat.match.get("eth_src")
-            if not eth_src or eth_src in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
+            match = stat.match
+            ip_proto = match.get("ip_proto")
+            if ip_proto not in _METERING_PROTOCOLS:
                 continue
-            is_l4 = self._match_has_l4_fields(stat.match)
-            if is_l4:
+            match_str = str(match)
+            if any(f in match_str for f in _TCP_MATCH_FIELDS):
                 skipped += 1
-                log.debug(
-                    "[DDoS-A] dpid=%-5d FILTRADA (L4): prio=%d pkts=%d match=%s",
-                    dpid, stat.priority, stat.packet_count, stat.match,
-                )
                 continue
+            in_port = match.get("in_port")
+            if in_port is None:
+                continue
+            eth_src, ipv4_src = self._host_mac_by_port(dpid, in_port)
+            if not eth_src:
+                skipped += 1
+                continue
+            if eth_src not in self._mac_to_ip and ipv4_src:
+                self._mac_to_ip[eth_src] = ipv4_src
             counted += 1
             current[eth_src] += stat.packet_count
-            ipv4_src = stat.match.get("ipv4_src")
-            if ipv4_src and eth_src not in self._mac_to_ip:
-                self._mac_to_ip[eth_src] = ipv4_src
 
-        log.debug(
+        # ── Contar reglas SYN-to-HTTP (prio=SYN_HTTP_COUNT_PRIORITY) por host.
+        # Estas reglas se instalan por puerto de host y cuentan los SYNs hacia
+        # puertos HTTP en el switch (sin enviarlos al controller), de modo que
+        # un SYN flood puede detectarse volumétricamente sin generar una
+        # tormenta de packet-in que congestione el canal de control.
+        syn_current = defaultdict(int)
+        syn_counted = 0
+        for stat in body:
+            if stat.priority != SYN_HTTP_COUNT_PRIORITY:
+                continue
+            match = stat.match
+            in_port = match.get("in_port")
+            if in_port is None:
+                continue
+            eth_src, ipv4_src = self._host_mac_by_port(dpid, in_port)
+            if not eth_src:
+                continue
+            if eth_src not in self._mac_to_ip and ipv4_src:
+                self._mac_to_ip[eth_src] = ipv4_src
+            syn_counted += 1
+            syn_current[eth_src] += stat.packet_count
+
+        log.info(
             "[DDoS-A] dpid=%-5d FlowStats: %d reglas total, "
-            "%d contadas (L2), %d filtradas (L4/PRI), %d MACs",
-            dpid, total_rules, counted, skipped, len(current),
+            "%d contadas (metering), %d filtradas, %d MACs; "
+            "%d reglas SYN-HTTP contadas",
+            dpid, total_rules, counted, skipped, len(current), syn_counted,
         )
 
         for eth_src, pkt_total in current.items():
@@ -511,6 +699,49 @@ class DDoSMitigator(app_manager.RyuApp):
                 self._trigger_mitigation(
                     src_ip, "VOLUMETRIC_FLOOD",
                     f"pps={pps:.0f} (UDP/ICMP FlowStats Δ={delta})",
+                    dpid,
+                )
+
+        # ── SYN flood volumétrico (CAPA 1b): contador de SYNs a puertos HTTP
+        # por host. Misma mecánica delta/pps que el volumétrico UDP/ICMP.
+        for eth_src, syn_total in syn_current.items():
+            key  = ("SYN", dpid, eth_src)
+            prev = self._prev_syn_pkt.get(key)
+            if prev is None:
+                self._prev_syn_pkt[key] = syn_total
+                log.debug(
+                    "[DDoS-SYN] dpid=%-5d eth=%s baseline=%d (primer muestreo)",
+                    dpid, eth_src, syn_total,
+                )
+                continue
+            delta = syn_total - prev
+            if delta < 0:
+                self._prev_syn_pkt[key] = syn_total
+                log.debug(
+                    "[DDoS-SYN] dpid=%-5d eth=%s delta=%d (counter reset)",
+                    dpid, eth_src, delta,
+                )
+                continue
+            self._prev_syn_pkt[key] = syn_total
+            if delta == 0:
+                continue
+
+            syn_s  = delta / SYN_FLOOD_WINDOW
+            src_ip = self._mac_to_ip.get(eth_src)
+            log.info(
+                "[DDoS-SYN] dpid=%-5d eth=%s ip=%s Δ=%d syn/s=%.0f "
+                "threshold=%.0f %s",
+                dpid, eth_src, src_ip or "???", delta, syn_s,
+                SYN_FLOOD_THRESHOLD,
+                "*** BLOQUEAR ***" if syn_s >= SYN_FLOOD_THRESHOLD else "",
+            )
+            if not src_ip or src_ip in self._blocked or src_ip in IP_WHITELIST:
+                continue
+
+            if syn_s >= SYN_FLOOD_THRESHOLD:
+                self._trigger_mitigation(
+                    src_ip, "SYN_FLOOD",
+                    f"syn/s={syn_s:.0f} (FlowStats contador SYN Δ={delta})",
                     dpid,
                 )
 
@@ -905,21 +1136,6 @@ class DDoSMitigator(app_manager.RyuApp):
         if not any(payload.startswith(m) for m in HTTP_METHODS):
             return False
         return b"HTTP/" in payload or b"\r\n" in payload
-
-    @staticmethod
-    def _match_has_l4_fields(match) -> bool:
-        """
-        Detecta si un match de FlowStats contiene campos de capa 4.
-
-        Las reglas L2 de dc_switch (in_port, eth_src, eth_dst) NO contienen
-        campos L4 y su packet_count incluye todo el tráfico (TCP, UDP, etc).
-        Solo esas reglas deben contribuir al conteo volumétrico.
-
-        Las reglas L4 (con ip_proto, tcp_dst, udp_src, etc) representan
-        tráfico filtrado por protocolo y NO deben contarse como volumen.
-        """
-        match_str = str(match)
-        return any(f in match_str for f in _L4_MATCH_FIELDS)
 
     def _update_packetin_stats(self):
         """Monitor de tasa PacketIn. Alerta si supera PACKETIN_WARN_RATE."""

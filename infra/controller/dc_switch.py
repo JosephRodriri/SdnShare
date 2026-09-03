@@ -30,7 +30,6 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-from ryu.app.ofctl.api import get_datapath
 from base_switch import BaseSwitch
 from utils import Network
 
@@ -65,6 +64,11 @@ class SpineLeaf1(BaseSwitch):
         # Create central MAC table
         self.mac_table = {}
 
+        # Own datapath registry {dpid: datapath}. Populated on connectivity so
+        # cross-leaf forwarding does not depend on Ryu's ofctl get_datapath(),
+        # which can transiently return None for an already-connected switch.
+        self.datapaths = {}
+
         # Ignore these packet types
         self.ignore = [ether_types.ETH_TYPE_LLDP, ether_types.ETH_TYPE_IPV6]
 
@@ -77,6 +81,9 @@ class SpineLeaf1(BaseSwitch):
         datapath = event.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+
+        # Register our own handle to the datapath
+        self.datapaths[datapath.id] = datapath
 
         # Delete all exiting flows
         msgs = [self.del_flow(datapath)]
@@ -196,8 +203,27 @@ class SpineLeaf1(BaseSwitch):
                 self.send_messages(datapath, msgs)
 
                 # In the spine switch
-                spine_datapath = get_datapath(self, spine_id)
-                dst_datapath = get_datapath(self, dst_host["dpid"])
+                spine_datapath = self.datapaths.get(spine_id)
+                dst_datapath = self.datapaths.get(dst_host["dpid"])
+
+                # If a switch has not (re)connected yet, its handle is missing
+                # from our registry. Crashing here on every PacketIn spams the
+                # event loop with tracebacks, which starves the mitigator's
+                # FlowStats polling and makes volumetric/syn attacks go
+                # undetected. Fail-open instead: log and drop this packet; the
+                # next PacketIn will retry once the datapath connects.
+                if (
+                    spine_datapath is None
+                    or dst_datapath is None
+                ):
+                    self.logger.warning(
+                        "Packet from %i %s %s %i: datapath no registrado "
+                        "(spine=%s dst_dpid=%s) - descartando este paquete",
+                        datapath.id, src, dst, in_port, spine_id,
+                        dst_host.get("dpid"),
+                    )
+                    return
+
                 spine_ingress_port = net.links[spine_id, datapath.id]["port"]
                 spine_egress_port = net.links[spine_id, dst_datapath.id]["port"]
 
@@ -239,7 +265,9 @@ class SpineLeaf1(BaseSwitch):
                 # in the source switch
                 in_port = in_port if datapath.id == leaf else ofproto.OFPP_CONTROLLER
                 # Get the datapath object
-                dpath = get_datapath(self, leaf)
+                dpath = self.datapaths.get(leaf)
+                if dpath is None:
+                    continue
                 # Send this packet to the switch to flood it.
                 msgs = self.forward_packet(
                     dpath, event.msg.data, in_port, ofproto.OFPP_ALL
