@@ -5,8 +5,6 @@ echo "🚀 Iniciando lab DDoS con tmux..."
 # Crear sesión tmux
 tmux new-session -d -s ddos_lab
 
-# Panel 0: Monitor
-tmux send-keys -t ddos_lab:0 'cd ~/Desktop/SdnShare&& ./infra/monitoring/pk_monitor.sh' C-m
 
 # Panel 1: Mininet
 tmux split-window -v -t ddos_lab:0

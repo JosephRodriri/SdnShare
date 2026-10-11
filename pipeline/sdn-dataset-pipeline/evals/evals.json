@@ -1,0 +1,23 @@
+{
+  "skill_name": "sdn-dataset-pipeline",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I ran a SYN flood attack in my Mininet lab and captured it with tshark. The file is at /tmp/ddos_synflood.pcap inside my Docker container (service name: mininet). I want to process this into a dataset for training a RandomForest. The whole capture is attack traffic — no normal traffic mixed in. Help me run the full pipeline.",
+      "expected_output": "Runs all 5 pipeline steps: extraction via docker tshark command, labeling with DDOS label via filename method, cleaning with quality report, 5s window feature engineering, and 80/20 stratified split. Produces train.csv and test.csv with 12 numeric features and label_enc column.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have a single pcap that contains mixed traffic: normal HTTP from 0-30s, then a port scan from 30-60s, then normal again from 60-90s. The file is /tmp/mixed_capture.pcap in Docker. How do I label the different attack segments and run the pipeline?",
+      "expected_output": "Guides the user to use --method timestamp, helps them create an intervals.json file with the port scan segment, runs 02_label.py with timestamp method, then runs the remaining steps. Shows how to construct the intervals JSON.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I already have a labeled CSV at datasets/raw/arp_spoof_labeled.csv with columns: frame.number, frame.time_relative, ip.src, ip.dst, ip.proto, tcp.srcport, tcp.dstport, tcp.flags.str, tcp.window_size, frame.len, label. I just need to clean it, add features, and get train/test splits.",
+      "expected_output": "Skips steps 1-2, runs 03_clean.py -> 04_features.py -> 05_split_export.py in sequence. Notes that ARP-only rows will be dropped in cleaning since they lack ip.src/ip.dst, and explains why this is expected behavior for the ARP_SPOOF label.",
+      "files": []
+    }
+  ]
+}

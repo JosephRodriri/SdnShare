@@ -15,6 +15,12 @@ dist/
 build/
 .venv/
 venv/
+pipeline/.venv/
+
+# ═══════════════════════ Pipeline datasets ══════════════════
+datasets/splits/
+datasets/processed/
+datasets/metadata/
 
 # ═══════════════════════ Environment ═══════════════════════
 .env

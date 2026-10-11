@@ -33,6 +33,7 @@ RESET  := \033[0m
 # --- Defaults ---
 IFACE ?= any
 COUNT ?= 0
+COUNT_FLAG = $(shell [ "$(COUNT)" = "0" ] && echo "" || echo "-c $(COUNT)")
 H     ?= 10.1.1.10
 S     ?= 10.1.1.10
 D     ?= 10.1.1.20
@@ -91,9 +92,9 @@ sniff:
 	@echo "  PCAP=/tmp/ddos.pcap Ruta de archivo      (default: /tmp/capture.pcap)"
 	@echo ""
 	@echo "  $(CYAN)Interfaces de tu topología:$(RESET)"
-	@echo "  s21-eth3 → h1    s21-eth4 → h2"
-	@echo "  s22-eth3 → h3    s22-eth4 → h4"
-	@echo "  s23-eth3 → h5    s23-eth4 → h6"
+	@echo "  SW21-eth3 → h1    SW21-eth4 → h2"
+	@echo "  SW22-eth3 → h3    SW22-eth4 → h4"  
+	@echo "  SW23-eth3 → h5    SW23-eth4 → h6"
 	@echo ""
 
 # =============================================================================
@@ -104,7 +105,7 @@ sniff-normal:
 	@echo "$(GREEN)🦈 [NORMAL] Tráfico general en $(IFACE) — $(COUNT) paquetes$(RESET)"
 	@echo "$(CYAN)frame# | tiempo | src | dst | proto | sport | dport | flags | win | len$(RESET)"
 	@echo "──────────────────────────────────────────────────────────────────────────"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		$(FIELDS_TCP) \
 		$(FORMAT)
 
@@ -118,7 +119,7 @@ sniff-ddos:
 	@echo "$(CYAN)Filtro activo: tcp.flags.syn==1 AND tcp.flags.ack==0$(RESET)"
 	@echo "$(CYAN)Señal de ataque: mismo dst + dstport con miles de paquetes/seg$(RESET)"
 	@echo "──────────────────────────────────────────────────────────────────────────"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "tcp.flags.syn==1 and tcp.flags.ack==0" \
 		-e frame.number \
 		-e frame.time_relative \
@@ -139,7 +140,7 @@ sniff-portscan:
 	@echo "$(CYAN)Filtro activo: tcp.flags.syn==1$(RESET)"
 	@echo "$(CYAN)Señal de ataque: mismo src, mismo dst, dstport incrementando$(RESET)"
 	@echo "──────────────────────────────────────────────────────────────────────────"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "tcp.flags.syn==1" \
 		-e frame.number \
 		-e frame.time_relative \
@@ -161,7 +162,7 @@ sniff-arp:
 	@echo "$(CYAN)Filtro activo: arp$(RESET)"
 	@echo "$(CYAN)Señal de ataque: arp.opcode==2 (reply) con MAC distinta para misma IP$(RESET)"
 	@echo "──────────────────────────────────────────────────────────────────────────"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "arp" \
 		$(FIELDS_ARP) \
 		$(FORMAT)
@@ -172,7 +173,7 @@ sniff-arp:
 .PHONY: sniff-icmp
 sniff-icmp:
 	@echo "$(GREEN)🟢 [ICMP] Capturando ICMP en $(IFACE)$(RESET)"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "icmp" \
 		-e frame.number \
 		-e frame.time_relative \
@@ -189,7 +190,7 @@ sniff-icmp:
 .PHONY: sniff-udp
 sniff-udp:
 	@echo "$(GREEN)🟢 [UDP] Capturando tráfico UDP en $(IFACE)$(RESET)"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "udp" \
 		-e frame.number \
 		-e frame.time_relative \
@@ -207,7 +208,7 @@ sniff-udp:
 .PHONY: sniff-host
 sniff-host:
 	@echo "$(CYAN)🎯 [HOST] Filtrando tráfico de/hacia $(H) en $(IFACE)$(RESET)"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "ip.src==$(H) or ip.dst==$(H)" \
 		$(FIELDS_TCP) \
 		$(FORMAT)
@@ -219,7 +220,7 @@ sniff-host:
 .PHONY: sniff-between
 sniff-between:
 	@echo "$(CYAN)↔️  [BETWEEN] Capturando entre $(S) y $(D) en $(IFACE)$(RESET)"
-	docker compose exec -T mininet tshark -l -i $(IFACE) -c $(COUNT) \
+	docker compose exec -T mininet tshark -l -i $(IFACE) $(COUNT_FLAG) \
 		-Y "(ip.src==$(S) and ip.dst==$(D)) or (ip.src==$(D) and ip.dst==$(S))" \
 		$(FIELDS_TCP) \
 		$(FORMAT)
@@ -232,7 +233,7 @@ sniff-between:
 sniff-save:
 	@echo "$(GREEN)💾 [SAVE] Guardando en $(PCAP) — interfaz $(IFACE) — $(COUNT) paquetes$(RESET)"
 	@echo "$(CYAN)Detener con Ctrl+C cuando tengas suficientes paquetes$(RESET)"
-	docker compose exec -T mininet tshark -i $(IFACE) -c $(COUNT) -w $(PCAP)
+	docker compose exec -T mininet tshark -i $(IFACE) $(COUNT_FLAG) -w $(PCAP)
 	@echo "$(GREEN)✅ Archivo guardado: $(PCAP)$(RESET)"
 	@echo "$(CYAN)Para analizar: make sniff-replay PCAP=$(PCAP)$(RESET)"
 
